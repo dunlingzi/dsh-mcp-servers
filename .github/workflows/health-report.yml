@@ -1,0 +1,63 @@
+name: Health report
+
+on:
+  schedule:
+    # 每周一 UTC 02:17（北京时间 10:17）
+    - cron: '17 2 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: health-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    name: Collect metrics & open issue
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288 # v5
+        # 版本以根 package.json 的 packageManager 字段为单一事实源（勿同时指定 version）
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 刻意不构建：覆盖率只跑 unit + integration（直连 src），不消费 lib 产物
+      - name: Coverage（vitest coverage，分母仅 src，阈值见 vitest.config.ts）
+        run: pnpm cov
+
+      # CRAP 于 #722 阶段五完成 src 口径重建（复杂度取自 ESLint 的 complexity 规则，
+      # 覆盖率取自同一份 src 口径产物），恢复接入；crap-report.json 供报告正文消费
+      # （见 health-report-body.mjs）。
+      - name: CRAP（热点报告；strict 见 gauntlet.config.json 的 crap.strict）
+        run: pnpm crap
+
+      - name: Generate report body
+        run: node scripts/release/health-report-body.mjs > health-body.md
+
+      - name: Create health issue（幂等：同日重跑不重复建）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="chore(health): 周度健康报告 $(date -u +%Y-%m-%d)"
+          EXISTING=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number --jq '.[0].number')
+          if [ -n "$EXISTING" ]; then
+            echo "issue #$EXISTING 已存在，跳过创建"
+          else
+            gh issue create --title "$TITLE" --body-file health-body.md
+          fi

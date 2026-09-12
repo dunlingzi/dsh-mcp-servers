@@ -1,0 +1,144 @@
+{
+    "$testLayers": {
+        "$comment": "测试分层与变异面登记的单一事实源。runner 层 = test/**/*.test.ts 的全集（vitest include 的 glob 即此口径）；mutation 层 = unit + integration（in-process，可进变异面）；exclude 层 = client（断言对象是构建产物 lib/client.js，而 mutate 面本身排除 src/client/**，登记进变异面测试清单只会增加每个段的 dry run 成本、杀灭贡献为零）+ e2e（真实端口/子进程/真机系统调用）。support 不入任何层：test/helpers.ts、test/smoke-lib.ts 是支撑模块，不是测试条目。unitExemptions 是单元层内「写了单元测试但刻意不进变异面」的逐条裁决（每条必须写明理由；gate 校验其非空且真实存在于 unit 层）。gate 判据：每个 test/**/*.test.ts 必须落入某一层的 glob 或某条排除 glob（无第三条路），故新增测试文件必须显式决定其层归属，不能靠「没写进清单」逃逸。",
+        "layers": {
+            "unit": "test/unit/**/*.test.ts",
+            "integration": "test/integration/**/*.test.ts",
+            "client": "test/client/**/*.test.ts",
+            "e2e": "test/e2e/**/*.test.ts"
+        },
+        "mutationLayers": [
+            "unit",
+            "integration"
+        ],
+        "mutationExcludeLayers": [
+            "client",
+            "e2e"
+        ]
+    },
+    "sharedDefaults": {
+        "testRunner": "vitest",
+        "concurrency": 16,
+        "timeoutMS": 60000,
+        "dryRunTimeoutMinutes": 5,
+        "reporters": [
+            "progress",
+            "clear-text",
+            "json"
+        ],
+        "coverageAnalysis": "perTest",
+        "tempDirName": ".stryker-tmp",
+        "cleanTempDir": true,
+        "excludedMutations": [
+            "StringLiteral",
+            "ArrayLiteral",
+            "ObjectLiteral",
+            "TemplateLiteral"
+        ],
+        "vitest": {
+            "related": false
+        }
+    },
+    "packages": {
+        "dsh-mcp-servers": {
+            "concurrency": 16,
+            "timeoutMS": 60000,
+            "segments": {
+                "entry": {
+                    "mutate": [
+                        "packages/dsh-mcp-servers/src/index.ts",
+                        "packages/dsh-mcp-servers/src/workspace/**/*.ts",
+                        "packages/dsh-mcp-servers/src/config/model/**/*.ts"
+                    ],
+                    "excludes": [
+                        "!packages/dsh-mcp-servers/src/client/**",
+                        "!packages/dsh-mcp-servers/src/types/**",
+                        "!packages/dsh-mcp-servers/src/integration/**"
+                    ],
+                    "comment": "entry——index+workspace（工作空间路由域）+config/model（归一化/导入/schema）；types/integration（type-only）显式排除；测试全套跑（perTest 关联）；incremental 基线随 observe 班次重建。"
+                },
+                "manager": {
+                    "mutate": [
+                        "packages/dsh-mcp-servers/src/connection/orchestrator/**/*.ts"
+                    ],
+                    "excludes": [
+                        "!packages/dsh-mcp-servers/src/client/**",
+                        "!packages/dsh-mcp-servers/src/types/**",
+                        "!packages/dsh-mcp-servers/src/integration/**"
+                    ],
+                    "comment": "manager——connection/orchestrator（McpServers 类主体+展示投影 tool-names）；types/integration（type-only）显式排除；测试全套跑（perTest 关联）；incremental 基线随 observe 班次重建。"
+                },
+                "middleware": {
+                    "mutate": [
+                        "packages/dsh-mcp-servers/src/connection/runtime/middleware.ts",
+                        "packages/dsh-mcp-servers/src/connection/runtime/limits.ts",
+                        "packages/dsh-mcp-servers/src/inject/**/*.ts",
+                        "packages/dsh-mcp-servers/src/pipeline/authorize.ts"
+                    ],
+                    "excludes": [
+                        "!packages/dsh-mcp-servers/src/client/**",
+                        "!packages/dsh-mcp-servers/src/types/**",
+                        "!packages/dsh-mcp-servers/src/integration/**"
+                    ],
+                    "comment": "middleware——中间层池（runtime/middleware）+limits+工具注册面（inject/）+策略裁决族（pipeline/authorize）；types/integration（type-only）显式排除；测试全套跑（perTest 关联）；incremental 基线随 observe 班次重建。"
+                },
+                "routes": {
+                    "mutate": [
+                        "packages/dsh-mcp-servers/src/api/**/*.ts"
+                    ],
+                    "excludes": [
+                        "!packages/dsh-mcp-servers/src/client/**",
+                        "!packages/dsh-mcp-servers/src/types/**",
+                        "!packages/dsh-mcp-servers/src/integration/**"
+                    ],
+                    "comment": "routes——api 层（routes 装配/端点控制器/查询辅助）；types/integration（type-only）显式排除；测试全套跑（perTest 关联）；incremental 基线随 observe 班次重建。"
+                },
+                "supervisor": {
+                    "mutate": [
+                        "packages/dsh-mcp-servers/src/connection/runtime/supervisor.ts",
+                        "packages/dsh-mcp-servers/src/connection/runtime/reconnect.ts",
+                        "packages/dsh-mcp-servers/src/config/store/**/*.ts",
+                        "packages/dsh-mcp-servers/src/stats/**/*.ts"
+                    ],
+                    "excludes": [
+                        "!packages/dsh-mcp-servers/src/client/**",
+                        "!packages/dsh-mcp-servers/src/types/**",
+                        "!packages/dsh-mcp-servers/src/integration/**"
+                    ],
+                    "comment": "supervisor——连接监督器（runtime/supervisor+reconnect）+状态持久化（config/store）+统计（stats）；types/integration（type-only）显式排除；测试全套跑（perTest 关联）；incremental 基线随 observe 班次重建。"
+                },
+                "runtime": {
+                    "mutate": [
+                        "packages/dsh-mcp-servers/src/bootstrap/**/*.ts",
+                        "packages/dsh-mcp-servers/src/connection/runtime/transport.ts",
+                        "packages/dsh-mcp-servers/src/connection/runtime/protocol.ts",
+                        "packages/dsh-mcp-servers/src/pipeline/**/*.ts",
+                        "packages/dsh-mcp-servers/src/catalog/**/*.ts"
+                    ],
+                    "excludes": [
+                        "!packages/dsh-mcp-servers/src/client/**",
+                        "!packages/dsh-mcp-servers/src/types/**",
+                        "!packages/dsh-mcp-servers/src/integration/**"
+                    ],
+                    "comment": "runtime——组合根（bootstrap/）+transport/protocol+pipeline（执行管道域）+catalog（目录域）；types/integration（type-only）显式排除；测试全套跑（perTest 关联）；incremental 基线随 observe 班次重建。"
+                }
+            },
+            "testLayers": {
+                "unitExemptions": {
+                    "packages/dsh-mcp-servers/test/unit/unit-shared.test.ts": "被测对象是 workspace 根 shared/settings-namespace.ts（不在本包 mutate 面内），登记它零杀灭、只增加各段 dry run 执行面"
+                },
+                "coverageExcludes": [
+                    "!packages/dsh-mcp-servers/src/**/interface.ts"
+                ],
+                "testMutationExemptions": {
+                    "unit": {
+                        "packages/dsh-mcp-servers/test/unit/unit-shared.test.ts": "被测对象是 workspace 根 shared/settings-namespace.ts（不在本包 mutate 面内），登记它零杀灭、只增加各段 dry run 执行面"
+                    },
+                    "integration": {
+                        "packages/dsh-mcp-servers/test/integration/service-contract.test.ts": "契约编译面用例：静态读取 src/bootstrap/apply-services.ts 的源文本比对 provide 方法集；在 Stryker 沙箱内被测源码已插桩，源文本断言必然失败。该用例的价值是类型/编译面与契约清单漂移，不产生变异杀灭，故不进变异面（随 pnpm test:scripts 的 service-contract-wiring 与 pnpm typecheck 生效）"
+                    }
+                }
+            }
+        }
+    }
+}

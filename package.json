@@ -1,0 +1,60 @@
+{
+  "name": "dsh-mcp-servers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "DSH（DeepSeek Harness）MCP 服务器管理插件：设置页「MCP 服务器」面板，分级展示、快速接入、启停删除，中间层收敛模型面",
+  "license": "MIT",
+  "scripts": {
+    "build": "pnpm -r --filter !dsh-mcp-servers build",
+    "test": "pnpm -r --filter !dsh-mcp-servers test",
+    "contract": "node scripts/gate/contract-check.ts",
+    "pack:check": "node scripts/gate/pack-check.ts",
+    "verify:npmlayout": "node scripts/gate/verify-npm-layout.ts",
+    "stryker:gen": "node scripts/gate/gen-stryker-conf.mjs",
+    "stryker:check": "node scripts/gate/gen-stryker-conf.mjs --check",
+    "test:scripts": "node --test scripts/test/*.test.ts",
+    "repair:mcp-catalog": "node scripts/maintenance/repair-mcp-catalog-sessions.mjs",
+    "test:src-tests": "node scripts/gate/forbid-src-tests.mjs",
+    "gate:homedir": "node scripts/gate/forbid-homedir-src.mjs",
+    "gate:module-state": "node scripts/gate/forbid-module-state-src.mjs",
+    "docs:check": "node scripts/gate/verify-docs.ts --strict-en",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "gate:changed": "node scripts/gate/local-gate.mjs --tier changed",
+    "gate:pr": "node scripts/gate/local-gate.mjs --tier pr",
+    "gate:full": "node scripts/gate/local-gate.mjs --tier full",
+    "cov": "vitest run --coverage --project unit --project integration",
+    "crap": "node scripts/gate/crap-check.mjs",
+    "lint": "node tools/lint/bin/lint.mjs",
+    "prepare": "lefthook install"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin"
+  ],
+  "packageManager": "pnpm@11.21.0",
+  "lint-staged": {
+    "*.{ts,tsx,mts,cts,js,mjs,cjs}": "node tools/lint/bin/lint.mjs"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "21.2.2",
+    "@commitlint/config-conventional": "21.2.2",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
+    "@types/node": "^26.2.0",
+    "@vitest/coverage-istanbul": "4.1.11",
+    "acorn": "^8.18.0",
+    "esbuild": "^0.28.2",
+    "happy-dom": "^20.14.3",
+    "lefthook": "2.1.12",
+    "lint-staged": "17.5.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vitest": "4.1.11"
+  },
+  "engines": {
+    "node": ">=23.6"
+  }
+}

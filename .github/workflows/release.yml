@@ -1,0 +1,94 @@
+name: Release
+
+# Tag-triggered publish：推 vX.Y.Z tag 是唯一发布开关。
+# 校验每个包版本 == tag 版本（tag 是版本唯一来源）→ 全量门禁 →
+# 按依赖序 pnpm publish（7 子包 → 聚合包）→ 生成 GitHub Release。
+# 需要仓库 secret NPM_TOKEN（@wingsky scope 的 npm automation token）。
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build, test, publish, release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a8198c4bff370c8506180b035930dea56dbd5288 # v5
+        # 版本以根 package.json 的 packageManager 字段为单一事实源（勿同时指定 version）
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify versions（全包版本 == tag）
+        run: node scripts/release/verify-version.ts
+
+      - name: Build
+        run: pnpm build
+
+      - name: Contract
+        run: pnpm contract
+
+      - name: Tests
+        run: pnpm test
+
+      - name: Pack check
+        run: pnpm pack:check
+
+      - name: Publish to npm（pnpm，依赖序，幂等：版本已存在自动跳过）
+        run: |
+          set -e
+          if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
+            echo "::error::NPM_TOKEN secret 未配置——发布中止（仓库 Settings → Secrets and variables → Actions 配置 @wingsky-1 scope 的 npm automation token）"
+            exit 1
+          fi
+          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+          while read -r pkg; do
+            [ -z "$pkg" ] && continue
+            echo "==> publish $pkg"
+            pnpm --filter "$pkg" publish --no-git-checks
+          done < <(node scripts/release/publish-if-missing.ts)
+
+      # Release notes: prefer the agent-curated per-version file committed
+      # alongside the release (docs/release-notes/<tag>.md); fall back to
+      # GitHub's auto-generated notes only when that file is absent. The two
+      # paths are mutually exclusive (body_path vs generate_release_notes).
+      - name: Locate release notes
+        id: notes
+        run: |
+          f="docs/release-notes/${{ github.ref_name }}.md"
+          if [ -f "$f" ]; then echo "path=$f" >> "$GITHUB_OUTPUT"; else echo "path=" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Create GitHub Release (curated notes)
+        if: ${{ steps.notes.outputs.path != '' }}
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          body_path: ${{ steps.notes.outputs.path }}
+
+      - name: Create GitHub Release (fallback auto-notes)
+        if: ${{ steps.notes.outputs.path == '' }}
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          generate_release_notes: true

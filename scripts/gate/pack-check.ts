@@ -1,0 +1,225 @@
+#!/usr/bin/env node
+// @ts-nocheck
+'use strict'
+
+/**
+ * pack-check — 发布打包冒烟：pnpm pack 每个插件 → 解包校验 tarball 内容，
+ * 防发布断链（含 lib/.d.ts/README/LICENSE、无 ../../shared 残留、client id 契约、
+ * 运行时资源完整性）。
+ *
+ * client 产物断言复用 scripts/client-contract-lib.ts（唯一 stub/执行实现）。
+ */
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { executeClient } from '../lib/client-contract-lib.ts'
+import { extractInlinedPackages, readMermaidChunkRefs } from '../build/collect-licenses.ts'
+import { checkAggregateConsistency, filterOutRetiredDirs, listPluginDirs, loadManifest, warnUnknownEntries } from '../lib/plugins-manifest-lib.ts'
+import { resolvePackageScopeOrExit } from '../lib/package-scope.ts'
+import { checkExportTypesResolvable } from '../lib/exports-types-lib.ts'
+import { assertSharedDtsNoExtras, assertSharedDtsPresent, listSharedDts } from '../lib/shared-dts-lib.ts'
+import { checkCordisMergeReachability } from '../lib/dts-cordis-merge-lib.ts'
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+// Windows 下 pnpm 是 pnpm.cmd：裸名 spawnSync 找不到，而 Node ≥20.11 对 .cmd
+// 不带 shell 直接 spawn 会 EINVAL（CVE-2024-27980 加固），故 win32 走 shell。
+const PNPM = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+const PNPM_SPAWN_OPTS = process.platform === 'win32' ? { shell: true } : {}
+
+/**
+ * tar 参数装配：GNU tar 在 Windows 上把 `C:\...` 盘符路径当远程主机（rsh 语法）
+ * 解析——Windows 下统一加 `--force-local` 并把路径正斜杠化；Linux 下原样返回，
+ * 行为不变。
+ */
+function tarArgs(args: string[]): string[] {
+  if (process.platform !== 'win32') return args
+  return ['--force-local', ...args.map((a) => a.split('\\').join('/'))]
+}
+
+
+// 插件清单单一来源（issue #36）：枚举走 lib，目录集 == manifest.active ∪ standalone 前置闸
+warnUnknownEntries(ROOT)
+let manifest
+try {
+  manifest = loadManifest(ROOT)
+} catch (e) {
+  console.log(`FAIL plugins-manifest | ${e.message}`)
+  process.exit(1)
+}
+{
+  // 方向 B 已豁免 manifest.retired 残留目录（T1：#397 告警不红），物理全集传入，
+  // 保证「新目录必须登记」双向校验不退化。
+  const problems = checkAggregateConsistency({ dirNames: listPluginDirs(ROOT), manifest })
+  if (problems.length > 0) {
+    for (const p of problems) console.log(`FAIL plugins-manifest | ${p}`)
+    process.exit(1)
+  }
+  console.log('PASS plugins-manifest | 目录集 == manifest.active ∪ standalone 集')
+}
+// T1：打包循环按 manifest.retired 过滤退役残留目录（无 package.json，读包会裸崩）
+const { kept: plugins, skipped: retiredDirs } = filterOutRetiredDirs(listPluginDirs(ROOT), manifest)
+if (retiredDirs.length > 0) {
+  console.warn(`[pack-check] 跳过已退役包残留目录: ${retiredDirs.join(', ')}（manifest.retired 已登记，请清理）`)
+}
+// #722 门禁分层：**产物级**断言的切片（单包 PR 只需 pack 命中包；全仓口径留夜间）。
+// 目录集 == manifest 的一致性校验（上方）不依赖产物，保持全仓恒跑。
+const scoped = resolvePackageScopeOrExit(process.argv.slice(2), [...plugins])
+const targets = scoped === null ? plugins : plugins.filter((p) => scoped.includes(p))
+if (scoped !== null) {
+  const notIterated = scoped.filter((p) => !plugins.includes(p))
+  console.log(`[pack-check] 打包切片：${targets.length}/${plugins.length} 包（--packages ${scoped.join(',') || '（空）'}）`
+    + (notIterated.length > 0 ? `；${notIterated.join(', ')} 不在本闸逐包检查范围（聚合 patch 与依赖一致性由 aggregate:check 恒跑覆盖；本段的产物级断言见下方聚合包专项）` : ''))
+}
+// shared 声明副本期望清单（issue #461 L2）：仓库 shared/ 全部 .d.ts（递归含子目录）
+// 随包逐一断言——新增 shared 子目录/文件（如 client/i18n.d.ts）自动纳入，防漏打包静默
+const SHARED_DTS_EXPECTED = listSharedDts(ROOT)
+
+let failed = 0
+for (const p of targets) {
+  const tmp = mkdtempSync(join(tmpdir(), 'dsh-pack-'))
+  const name = JSON.parse(readFileSync(join(ROOT, 'packages', p, 'package.json'), 'utf8')).name
+  try {
+    // pnpm pack 到临时目录
+    execFileSync(PNPM, ['--filter', name, 'pack', '--pack-destination', tmp], { cwd: ROOT, stdio: 'pipe', ...PNPM_SPAWN_OPTS })
+    const tgz = readdirSync(tmp).find(f => f.endsWith('.tgz'))
+    const unpack = join(tmp, 'unpack')
+    execFileSync('tar', tarArgs(['-xzf', join(tmp, tgz), '-C', tmp]))
+    const pkgRoot = join(tmp, 'package')
+
+    const problems = []
+    if (!existsSync(join(pkgRoot, 'lib', 'index.js'))) problems.push('缺 lib/index.js')
+    if (!readdirSync(join(pkgRoot, 'lib')).some(f => f.endsWith('.d.ts'))) problems.push('缺 lib/*.d.ts')
+    // exports[].types 可解析：发布物每个带 types 条件的子路径，其 types 必须指向真实
+    // 文件。指向不存在文件时严格 TS 消费方按子路径导入静默降级 any（TS7016），而既有
+    // 门禁全看不见（contract-check 只断言 exports['./client'] 键存在）。判据实现见
+    // scripts/lib/exports-types-lib.ts（与导出面快照门禁共用「types → 相对路径」映射）。
+    for (const problem of checkExportTypesResolvable(pkgRoot)) problems.push(problem)
+    // 跨包 SDK 类型可达（#733 宪法第 3 条）：源面声明了 cordis 声明合并 ⇒ 合并必须
+    // 落在 lib/index.d.ts 的相对 import 闭包内。写在源 .d.ts 的合并不会被 emit，
+    // 消费方按包名导入时 ctx 服务面与 Events 事件面全部失类型，且没有任何既有门禁
+    // 能看见（实证：packages/dsh-notifier/src/service.d.ts）。判据实现见
+    // scripts/lib/dts-cordis-merge-lib.ts（含正反 fixture 自测）。
+    {
+      const merge = checkCordisMergeReachability(join(ROOT, 'packages', p), join(pkgRoot, 'lib'))
+      if (merge.problem) problems.push(merge.problem)
+    }
+    for (const f of ['README.md', 'LICENSE', 'cordis.patch.yml']) {
+      if (!existsSync(join(pkgRoot, f))) problems.push(`缺 ${f}`)
+    }
+    // shared 声明副本（bundle-host d.ts X1 递归复制，含子目录如 client/）须随包发布：
+    // 枚举比对仓库 shared/ 全部 .d.ts（issue #461 L2），缺哪个报哪个，防新增漏打包静默
+    const missingSharedDts = assertSharedDtsPresent(join(pkgRoot, 'shared'), SHARED_DTS_EXPECTED)
+    if (missingSharedDts.length > 0) {
+      problems.push(`缺 shared 声明副本: ${missingSharedDts.join(', ')}（shared 递归副本未随包）`)
+    }
+    // 查多（issue #478）：retired 模块移除后旧声明副本不得残留在包内——「源 shared/
+    // 移除某 d.ts 后旧副本仍随包发布」属过期类型面（files 白名单 shared/**/*.d.ts
+    // 仍会带走），查缺出口对残留静默放行，此处 fail-loud。
+    const extraSharedDts = assertSharedDtsNoExtras(join(pkgRoot, 'shared'), SHARED_DTS_EXPECTED)
+    if (extraSharedDts.length > 0) {
+      problems.push(`shared 副本残留: ${extraSharedDts.join(', ')}（源 shared/ 已无此文件，须清理）`)
+    }
+    const idx = readFileSync(join(pkgRoot, 'lib', 'index.js'), 'utf8')
+    // 只匹配 import 语句中的仓库外相对引用（esbuild 模块注释含路径文本，不算断链）
+    const outsideRef = /(?:from|import)\s*["']\.\.\/\.\.\/(?:shared|types)/.test(idx)
+    if (outsideRef) problems.push('lib 残留 ../../shared|types 运行时引用')
+    // client 产物 chunk（lib/client.js 及 client-mermaid.js 等，issue #477）：同款
+    // 自包含断言延伸到 client 面——client bundle 同样构建期内联 shared/client
+    // （如 client/ensure-style.js），chunk 内残留仓库外相对引用即发布断链。
+    for (const chunkFile of readdirSync(join(pkgRoot, 'lib')).filter((f) => /^client[^/]*\.js$/.test(f))) {
+      if (/(?:from|import)\s*["']\.\.\/\.\.\/(?:shared|types)/.test(readFileSync(join(pkgRoot, 'lib', chunkFile), 'utf8'))) {
+        problems.push(`${chunkFile} 残留 ../../shared|types 运行时引用`)
+      }
+    }
+    // loopback 围栏断言跟随 HTTP 面存在性：产物注入 webServer（有 RPC/路由面）
+    // 才要求 isLoopbackRequest；纯事件面插件（无 webServer，如 #153 模型继承器）
+    // 无 HTTP 面，围栏不适用。
+    if (idx.includes('webServer') && !idx.includes('isLoopbackRequest')) problems.push('内联后缺 isLoopbackRequest 导出')
+
+    // 第三方 license 归集断言（issue #13）：产物内联了第三方库（esbuild 模块
+    // 注释可证）⇒ 必须随包附 lib/THIRD-PARTY-LICENSES——存在、非空、含宽松系
+    // 许可字样（MIT/BSD/Apache/ISC，issue #104 补 ISC：mermaid 传递依赖 d3 系
+    // 多为 ISC），且覆盖每个被内联的包名。内联 = 分发库副本，
+    // 缺清单即合规缺口，fail-loud。
+    {
+      const inlined = new Set(extractInlinedPackages(idx))
+      // client.js 维持注释提取；client-mermaid.js（issue #104）minified 产物注释
+      // 已被移除，其内联证据来自构建期 metafile sidecar 清单 client-mermaid.deps.json。
+      const clientJsPath = join(pkgRoot, 'lib', 'client.js')
+      if (existsSync(clientJsPath)) {
+        for (const n of extractInlinedPackages(readFileSync(clientJsPath, 'utf8'))) inlined.add(n)
+      }
+      const chunkPath = join(pkgRoot, 'lib', 'client-mermaid.js')
+      if (existsSync(chunkPath)) {
+        // chunk 在而清单缺 = 构建链断链或发布物裁剪 → 覆盖断言会静默失效，fail-loud。
+        try {
+          for (const r of readMermaidChunkRefs(join(pkgRoot, 'lib'))) inlined.add(r.name)
+        } catch (e) {
+          problems.push(`client-mermaid.deps.json 校验失败: ${String(e.message).split('\n')[0]}`)
+        }
+        if (!existsSync(join(pkgRoot, 'lib', 'client-mermaid.deps.json'))) {
+          problems.push('存在 lib/client-mermaid.js 但缺 client-mermaid.deps.json（内联清单 sidecar）')
+        }
+      }
+      if (inlined.size > 0) {
+        const licPath = join(pkgRoot, 'lib', 'THIRD-PARTY-LICENSES')
+        if (!existsSync(licPath)) {
+          problems.push(`产物内联第三方库（${[...inlined].join(', ')}）但缺 lib/THIRD-PARTY-LICENSES`)
+        } else {
+          const lic = readFileSync(licPath, 'utf8')
+          if (!lic.trim()) problems.push('THIRD-PARTY-LICENSES 为空')
+          if (!/(MIT|BSD|Apache|ISC)/i.test(lic)) problems.push('THIRD-PARTY-LICENSES 缺 MIT/BSD/Apache/ISC 许可字样')
+          // 合规空段 fail-loud（issue #104 返工）：UNKNOWN / 未找到 license 文件 /
+          // 安装目录未找到 任一字样出现 = 存在「内联了副本却缺许可文本」的库，
+          // 原实现对此静默放行（khroma 小写 license 文件漏收即实证案例）。
+          if (/UNKNOWN|未找到 license 文件|安装目录未找到/.test(lic)) {
+            const bad = [...lic.matchAll(/={5,}\n([^\n]+)\n={5,}/g)]
+              .map((m) => m[1])
+              .filter((h) => h.includes('UNKNOWN'))
+            problems.push(`THIRD-PARTY-LICENSES 含未解析许可段${bad.length > 0 ? `（${bad.join('; ')}）` : ''}`)
+          }
+          for (const n of inlined) {
+            if (!lic.includes(n)) problems.push(`THIRD-PARTY-LICENSES 未覆盖被内联库 ${n}`)
+          }
+        }
+      }
+    }
+
+    // client id 契约（tarball 内产物）：load id 必须 === 完整包名——浏览器 arrive()
+    // 校验 factories.has(包名) 的同构模拟；防「打包/裁剪后产物与包名脱钩」再犯。
+    // 执行与 stub 实现来自 client-contract-lib（与 contract-check 同源）。
+    const clientPath = join(pkgRoot, 'lib', 'client.js')
+    if (existsSync(clientPath)) {
+      const { calls, factories, error } = executeClient(readFileSync(clientPath, 'utf8'))
+      if (error) {
+        problems.push(`client 产物执行失败: ${String(error.message).split('\n')[0]}`)
+      } else if (!factories.has(name)) {
+        problems.push(`client load id 与包名不一致（注册: ${[...factories.keys()].join(',') || '无'}，期望: ${name}）`)
+      }
+    }
+
+    // 运行时资源完整性：src/ 下非代码资源（bundle-host 复制进 lib/，如 toast.ps1）
+    // 必须随 tarball 发布——files 白名单规范化时最容易静默丢这类资源。
+    const srcDir = join(ROOT, 'packages', p, 'src')
+    if (existsSync(srcDir)) {
+      const missingResources = readdirSync(srcDir)
+        .filter((f) => !/\.(ts|tsx|js|mjs|cjs)$/.test(f))
+        .filter((f) => !existsSync(join(pkgRoot, 'lib', f)))
+      if (missingResources.length > 0) problems.push(`运行时资源未随包发布: ${missingResources.join(', ')}`)
+    }
+
+    if (problems.length > 0) failed++
+    console.log(`${problems.length === 0 ? 'PASS' : 'FAIL'} ${name} | ${problems.join('; ') || 'tarball 完整'}`)
+  } catch (e) {
+    failed++
+    console.log(`FAIL ${name} | ${String(e.message).split('\n')[0]}`)
+  } finally {
+    rmSync(tmp, { recursive: true, force: true })
+  }
+}
+// 聚合包专项已移除：本仓库为单插件仓库、无 dsh-plugins-all 聚合包；
+// 聚合 patch/依赖一致性断言随聚合包一起退役（历史实现见 dsh-plugin-hub 仓库）。
+console.log(failed === 0 ? '\npack-check：全部通过' : `\npack-check：${failed} 个失败`)
+process.exit(failed === 0 ? 0 : 1)

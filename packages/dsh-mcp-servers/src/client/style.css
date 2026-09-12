@@ -1,0 +1,454 @@
+/* dsh-mcp-servers — 设置页「MCP 服务器」样式。
+ *
+ * 由 build-client 的 .css text-loader 构建期内联进 client.js（产物自包含单文件）。
+ * 颜色优先取 DSH 主题变量（--dsw-alias-*），缺失时回退内置色值，浅色/深色主题
+ * 均可读。类名统一 ms- 前缀（mcp-servers），不留浮窗时代的全局选择器。
+ */
+
+.ms-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 8px 0 48px;
+  color: var(--dsw-alias-label-primary, #1f2329);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ms-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
+.ms-subtitle {
+  margin: 0 0 16px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+
+.ms-hint {
+  color: var(--dsw-alias-label-tertiary, #9aa1ad);
+  font-size: 12px;
+  margin: 4px 0 8px;
+}
+
+.ms-error-banner {
+  background: var(--dsw-alias-state-error-secondary, rgba(224, 72, 62, 0.1));
+  color: var(--dsw-alias-state-error-primary, #e0483e);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+/* ---- 工具行 ---- */
+
+.ms-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 8px 0 4px;
+}
+
+.ms-toolbar-left,
+.ms-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ms-count {
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 13px;
+}
+
+.ms-search {
+  min-width: 220px;
+  padding: 6px 10px;
+  border: 1px solid var(--dsw-alias-line-secondary, #d0d5dd);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-primary, transparent);
+  color: inherit;
+  outline: none;
+}
+
+.ms-search:focus {
+  border-color: var(--dsw-alias-brand-primary, #4e6ef2);
+}
+
+.ms-select {
+  padding: 6px 8px;
+  border: 1px solid var(--dsw-alias-line-secondary, #d0d5dd);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-primary, transparent);
+  color: inherit;
+}
+
+/* ---- 按钮 ---- */
+
+.ms-btn {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  color: inherit;
+  background: transparent;
+}
+
+.ms-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ms-btn-primary {
+  background: var(--dsw-alias-brand-primary, #4e6ef2);
+  color: #fff;
+}
+
+.ms-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.ms-btn-ghost {
+  border-color: var(--dsw-alias-line-secondary, #d0d5dd);
+}
+
+.ms-btn-ghost:hover:not(:disabled) {
+  background: var(--dsw-alias-bg-hover, rgba(127, 127, 127, 0.08));
+}
+
+.ms-btn-danger {
+  color: var(--dsw-alias-state-error-primary, #e0483e);
+  border-color: var(--dsw-alias-state-error-primary, #e0483e);
+}
+
+.ms-btn-danger:hover:not(:disabled) {
+  background: var(--dsw-alias-state-error-secondary, rgba(224, 72, 62, 0.08));
+}
+
+/* ---- 分组与卡片 ---- */
+
+.ms-group-title {
+  font-weight: 600;
+  margin: 16px 0 8px;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 13px;
+}
+
+.ms-group-count {
+  color: var(--dsw-alias-label-tertiary, #9aa1ad);
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+.ms-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ms-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--dsw-alias-line-secondary, #e5e7eb);
+  border-radius: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+
+.ms-card:hover {
+  border-color: var(--dsw-alias-brand-primary, #4e6ef2);
+}
+
+.ms-card-icon {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-hover, rgba(127, 127, 127, 0.1));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.ms-icon-glyph {
+  font-size: 16px;
+  opacity: 0.75;
+}
+
+.ms-dot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--dsw-alias-bg-primary, #fff);
+}
+
+.ms-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ms-card-name {
+  font-weight: 600;
+}
+
+.ms-card-sub {
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ms-card-tools {
+  color: var(--dsw-alias-label-tertiary, #9aa1ad);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.ms-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+.ms-empty {
+  border: 1px dashed var(--dsw-alias-line-secondary, #d0d5dd);
+  border-radius: 10px;
+  padding: 32px;
+  text-align: center;
+  color: var(--dsw-alias-label-tertiary, #9aa1ad);
+  margin-top: 16px;
+}
+
+/* ---- 探活结果 ---- */
+
+.ms-probe-ok,
+.ms-probe-fail {
+  font-size: 12px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.ms-probe-ok {
+  color: var(--dsw-alias-state-success-primary, #0f9d6e);
+  background: var(--dsw-alias-state-success-secondary, rgba(15, 157, 110, 0.1));
+}
+
+.ms-probe-fail {
+  color: var(--dsw-alias-state-error-primary, #e0483e);
+  background: var(--dsw-alias-state-error-secondary, rgba(224, 72, 62, 0.1));
+}
+
+/* ---- 启停开关 ---- */
+
+.ms-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex: none;
+}
+
+.ms-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.ms-switch-slider {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--dsw-alias-label-tertiary, #9aa1ad);
+  transition: background 0.15s ease;
+}
+
+.ms-switch-slider::before {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 2px;
+  top: 2px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s ease;
+}
+
+.ms-switch input:checked + .ms-switch-slider {
+  background: var(--dsw-alias-state-success-primary, #0f9d6e);
+}
+
+.ms-switch input:checked + .ms-switch-slider::before {
+  transform: translateX(16px);
+}
+
+.ms-switch-busy {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* ---- 编辑视图 ---- */
+
+.ms-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.ms-breadcrumb-root {
+  background: none;
+  border: none;
+  color: var(--dsw-alias-brand-primary, #4e6ef2);
+  cursor: pointer;
+  padding: 0;
+  font-size: 13px;
+}
+
+.ms-breadcrumb-sep {
+  color: var(--dsw-alias-label-tertiary, #9aa1ad);
+}
+
+.ms-breadcrumb-current {
+  color: var(--dsw-alias-label-secondary, #6b7280);
+}
+
+.ms-edit-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ms-mode-switch {
+  display: inline-flex;
+  border: 1px solid var(--dsw-alias-line-secondary, #d0d5dd);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ms-mode-switch button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.ms-mode-switch button.ms-mode-active {
+  background: var(--dsw-alias-brand-primary, #4e6ef2);
+  color: #fff;
+}
+
+.ms-form-card {
+  border: 1px solid var(--dsw-alias-line-secondary, #e5e7eb);
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 12px;
+}
+
+.ms-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ms-field-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ms-field-row .ms-field {
+  flex: 1;
+  min-width: 220px;
+}
+
+.ms-field-narrow {
+  max-width: 280px;
+}
+
+.ms-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.ms-input,
+.ms-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-line-secondary, #d0d5dd);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-primary, transparent);
+  color: inherit;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.ms-input:disabled {
+  opacity: 0.6;
+}
+
+.ms-input:focus,
+.ms-textarea:focus,
+.ms-json:focus {
+  outline: none;
+  border-color: var(--dsw-alias-brand-primary, #4e6ef2);
+}
+
+.ms-field-hint {
+  color: var(--dsw-alias-label-tertiary, #9aa1ad);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.ms-textarea {
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.ms-json {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid var(--dsw-alias-line-secondary, #d0d5dd);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-primary, transparent);
+  color: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  resize: vertical;
+}
+
+.ms-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.ms-form-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}

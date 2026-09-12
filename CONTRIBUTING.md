@@ -1,0 +1,55 @@
+# Contributing
+
+感谢对 dsh-mcp-servers 感兴趣！本仓库是 DSH（DeepSeek Harness）MCP 服务器管理插件的开源发布仓，
+代码规范遵循 [Conventional Commits](https://www.conventionalcommits.org)。
+
+## 提交信息
+
+```
+<type>(<scope>): <subject>
+```
+
+- type：`feat` / `fix` / `docs` / `refactor` / `test` / `chore` / `ci` / `perf`
+- scope：包名（如 `dsh-mcp-servers`）或省略
+- subject：动词开头，一行说清改动
+
+示例：`fix(dsh-mcp-servers): 修复 probe 对 streamable-http 的超时透传`
+
+## 开发流程
+
+1. Fork 本仓库（或直接提 issue 讨论，流程见 [docs/ISSUE-WORKFLOW.md](docs/ISSUE-WORKFLOW.md)）
+2. 创建功能分支：`feat/<主题>` 或 `fix/<主题>`
+3. 本地验证全绿：
+
+```sh
+pnpm install
+pnpm --filter @wingsky-1/dsh-mcp-servers build && pnpm --filter @wingsky-1/dsh-mcp-servers test
+node scripts/gate/contract-check.ts && node scripts/gate/pack-check.ts
+```
+
+  这是**单包快跑**（可选最小集）；仓库完整的门禁清单与「改动类型 → 追加门禁」对照表
+  以 [AGENTS.md 门禁矩阵](AGENTS.md) 为单一事实源，提交前请按其跑全。
+
+4. 推分支 → 开 PR（描述动机 + 改动 + 验证结果）
+5. CI 全绿后 review → squash merge
+
+## 提交前检查
+
+- 敏感信息：不提交本机路径/用户名/IP/凭据（全仓库 grep 本机用户名、`192.168`、`/home/<user>`、token 形状应为空）
+- 发布物：`pnpm pack` 后 tarball 不含 `src/`、`test/`、内部文档
+- 只推功能代码与对外文档，不推内部治理/讨论细节
+
+## 测试
+
+- smoke 全部无网络、无真实凭据，本地可直接运行
+- 新功能/修复必须带 smoke 断言（含路由 403/405 围栏用例）
+
+## 参考文档
+
+- 开发规范（宿主/客户端写法、构建契约、多端兼容、测试防 flake 纪律）：[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+- 仓库规则（全局约定、发布纪律）：[AGENTS.md](AGENTS.md)
+- issue 处理流程（提报 / 分诊 / 修复 / 关闭全周期）：[docs/ISSUE-WORKFLOW.md](docs/ISSUE-WORKFLOW.md)
+
+## License
+
+MIT

@@ -1,0 +1,12 @@
+{
+  "$comment": "变异段实测台账——由 scripts/gate/mutation-ledger.mjs 从 Actions run 日志解析生成，禁止手工编造数值。本仓库自 dsh-plugin-hub 拆出后台账从零起记：六段（entry/manager/middleware/routes/runtime/supervisor）均登记进 unmeasured（附理由），由 observe 班次首跑后按测量值填充。",
+  "measurements": [],
+  "unmeasured": {
+    "dsh-mcp-servers-entry": "拆出后首夜未测（observe 班次按 conf 段集合重建测量值）",
+    "dsh-mcp-servers-manager": "拆出后首夜未测（observe 班次按 conf 段集合重建测量值）",
+    "dsh-mcp-servers-middleware": "拆出后首夜未测（observe 班次按 conf 段集合重建测量值）",
+    "dsh-mcp-servers-routes": "拆出后首夜未测（observe 班次按 conf 段集合重建测量值）",
+    "dsh-mcp-servers-runtime": "拆出后首夜未测（observe 班次按 conf 段集合重建测量值）",
+    "dsh-mcp-servers-supervisor": "拆出后首夜未测（observe 班次按 conf 段集合重建测量值）"
+  }
+}
