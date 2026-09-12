@@ -191,7 +191,9 @@ function main(argv) {
   const results = []
   for (const step of steps) {
     console.log(`\n[local-gate] ▶ ${step.label}\n[local-gate]   ${step.cmd ?? PNPM} ${step.args.join(' ')}`)
-    const res = spawnSync(step.cmd ?? PNPM, step.args, { cwd: ROOT, stdio: 'inherit' })
+    // Windows：pnpm 是 pnpm.cmd，Node ≥20.11 对 .cmd 不带 shell 的 spawnSync 会
+    // EINVAL（CVE-2024-27980 加固），故 win32 统一走 shell（args 均无空格，安全）。
+    const res = spawnSync(step.cmd ?? PNPM, step.args, { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' })
     const code = res.status ?? 1
     results.push({ label: step.label, code })
     if (code !== 0) {

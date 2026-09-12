@@ -28,6 +28,25 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const PNPM = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 const PNPM_SPAWN_OPTS = process.platform === 'win32' ? { shell: true } : {}
 
+/**
+ * 解包 tgz（跨平台）：Windows 的 tar 有两种发行——System32 bsdtar（认盘符路径、
+ * 不认 --force-local）与 Git Bash 的 GNU tar（认 --force-local、裸盘符路径会被当
+ * 远程主机）。路径统一正斜杠后先按 bsdtar 形态试，失败回落 GNU 形态；非 win32
+ * 直接按常规形态。
+ */
+function extractTar(tgz: string, dest: string): void {
+  const fwd = (p: string) => p.split('\\').join('/')
+  if (process.platform !== 'win32') {
+    execFileSync('tar', ['-xzf', fwd(tgz), '-C', fwd(dest)], { stdio: 'pipe' })
+    return
+  }
+  try {
+    execFileSync('tar', ['-xzf', fwd(tgz), '-C', fwd(dest)], { stdio: 'pipe' })
+  } catch {
+    execFileSync('tar', ['--force-local', '-xzf', fwd(tgz), '-C', fwd(dest)], { stdio: 'pipe' })
+  }
+}
+
 // T1（#397）：退役残留目录无 package.json，按 manifest.retired 过滤（残留属清理债，
 // 不参与布局验证；plugins-manifest-lib 方向 B 已豁免并告警）。listPluginDirs 保持
 // 物理枚举语义不变，仅消费侧按 manifest 过滤，不掏空「新目录必须登记」守卫。
@@ -79,7 +98,7 @@ for (const p of layoutTargets) {
   try {
     execFileSync(PNPM, ['--filter', name, 'pack', '--pack-destination', tmp], { cwd: ROOT, stdio: 'pipe', ...PNPM_SPAWN_OPTS })
     const tgz = readdirSync(tmp).find(f => f.endsWith('.tgz'))
-    execFileSync('tar', ['-xzf', join(tmp, tgz), '-C', tmp])
+    extractTar(join(tmp, tgz), tmp)
     const pkgRoot = join(tmp, 'package')
     const problems = []
 

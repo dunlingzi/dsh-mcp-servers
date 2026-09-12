@@ -29,13 +29,22 @@ const PNPM = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 const PNPM_SPAWN_OPTS = process.platform === 'win32' ? { shell: true } : {}
 
 /**
- * tar 参数装配：GNU tar 在 Windows 上把 `C:\...` 盘符路径当远程主机（rsh 语法）
- * 解析——Windows 下统一加 `--force-local` 并把路径正斜杠化；Linux 下原样返回，
- * 行为不变。
+ * 解包 tgz（跨平台）：Windows 的 tar 有两种发行——System32 bsdtar（认盘符路径、
+ * 不认 --force-local）与 Git Bash 的 GNU tar（认 --force-local、裸盘符路径会被当
+ * 远程主机）。路径统一正斜杠后先按 bsdtar 形态试，失败回落 GNU 形态；非 win32
+ * 直接按常规形态。（原 tarArgs --force-local 单形态在 bsdtar 下必失败。）
  */
-function tarArgs(args: string[]): string[] {
-  if (process.platform !== 'win32') return args
-  return ['--force-local', ...args.map((a) => a.split('\\').join('/'))]
+function extractTar(tgz: string, dest: string): void {
+  const fwd = (p: string) => p.split('\\').join('/')
+  if (process.platform !== 'win32') {
+    execFileSync('tar', ['-xzf', fwd(tgz), '-C', fwd(dest)], { stdio: 'pipe' })
+    return
+  }
+  try {
+    execFileSync('tar', ['-xzf', fwd(tgz), '-C', fwd(dest)], { stdio: 'pipe' })
+  } catch {
+    execFileSync('tar', ['--force-local', '-xzf', fwd(tgz), '-C', fwd(dest)], { stdio: 'pipe' })
+  }
 }
 
 
@@ -85,7 +94,7 @@ for (const p of targets) {
     execFileSync(PNPM, ['--filter', name, 'pack', '--pack-destination', tmp], { cwd: ROOT, stdio: 'pipe', ...PNPM_SPAWN_OPTS })
     const tgz = readdirSync(tmp).find(f => f.endsWith('.tgz'))
     const unpack = join(tmp, 'unpack')
-    execFileSync('tar', tarArgs(['-xzf', join(tmp, tgz), '-C', tmp]))
+    extractTar(join(tmp, tgz), tmp)
     const pkgRoot = join(tmp, 'package')
 
     const problems = []

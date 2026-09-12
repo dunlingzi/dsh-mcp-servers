@@ -62,14 +62,15 @@ export default defineConfig({
       exclude: ['**/*.d.ts', '**/client/**'],
       reporter: ['text', 'json-summary', 'json', 'lcov'],
       reportsDirectory: 'coverage',
-      // 基线（#722 阶段三实测，分母 132 文件）：lines 81.77 / functions 81.18 /
-      // statements 79.01 / branches 71.79，阈值留 1.0~1.8pp 余量。覆盖率数据确定性
-      // （连跑逐字一致），余量用于正常代码演进；下调阈值须走 threshold-monotonic 判定。
+      // 基线（单插件仓库拆出时实测，分母含本包 src + shared）：lines 76.42 /
+      // functions 76.7 / statements 73.7 / branches 64.0，阈值留 ~0.5-1pp 余量。
+      // 覆盖率数据确定性（连跑逐字一致），余量用于正常代码演进；下调阈值须走
+      // threshold-monotonic 判定。
       thresholds: {
-        lines: 80,
-        functions: 80,
-        statements: 78,
-        branches: 70,
+        lines: 76,
+        functions: 76,
+        statements: 73,
+        branches: 63,
       },
     },
   },

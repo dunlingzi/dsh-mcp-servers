@@ -5,6 +5,10 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
+// POSIX-only 假 gh shim（冒号分隔 PATH + shell 脚本）在 Windows 无法运行：
+// 覆盖 gh 分流 / 恢复段 / 首夜分支的 4 个端到端用例在 win32 跳过（CI ubuntu 仍执行）。
+const IS_WIN = process.platform === 'win32';
+
 const scriptPath = join(process.cwd(), 'scripts', 'gate', 'orphan-baseline.mjs');
 const overlayScriptPath = join(process.cwd(), 'scripts', 'gate', 'overlay-baseline.mjs');
 
@@ -151,7 +155,7 @@ test('#718: overlay-baseline 查询关联 PR 失败必须 fail-loud（exit 1）'
   }
 });
 
-test('#718: overlay-baseline 查询 Workflow Runs 失败必须 fail-loud（exit 1）', () => {
+test('#718: overlay-baseline 查询 Workflow Runs 失败必须 fail-loud（exit 1）', { skip: IS_WIN }, () => {
   const tmp = mkdtempSync(join(tmpdir(), 'overlay-test-runsfail-'));
   try {
     // 假 gh 分流：pulls 查询成功 → 只让 runs 查询失败，锁定本次被改的那一处站点。
@@ -175,7 +179,7 @@ test('#718: overlay-baseline 查询 Workflow Runs 失败必须 fail-loud（exit 
   }
 });
 
-test('#718: overlay-baseline 恢复段——探针说 present 但拉取失败时 fail-loud（exit 1）', () => {
+test('#718: overlay-baseline 恢复段——探针说 present 但拉取失败时 fail-loud（exit 1）', { skip: IS_WIN }, () => {
   const tmp = mkdtempSync(join(tmpdir(), 'overlay-test-restore-'));
   const bin = mkdtempSync(join(tmpdir(), 'overlay-test-bin-'));
   try {
@@ -202,7 +206,7 @@ test('#718: overlay-baseline 恢复段——探针说 present 但拉取失败时
   }
 });
 
-test('#718: overlay-baseline 恢复段——探针明确 absent 时走首夜且不得崩（exit 0）', () => {
+test('#718: overlay-baseline 恢复段——探针明确 absent 时走首夜且不得崩（exit 0）', { skip: IS_WIN }, () => {
   const tmp = mkdtempSync(join(tmpdir(), 'overlay-test-firstnight-'));
   const bin = mkdtempSync(join(tmpdir(), 'overlay-test-bin2-'));
   try {
@@ -235,7 +239,7 @@ exec "${real}" "$@"
   }
 });
 
-test('#718: overlay-baseline 「查到了但没有」仍是合法 no-op（exit 0）', () => {
+test('#718: overlay-baseline 「查到了但没有」仍是合法 no-op（exit 0）', { skip: IS_WIN }, () => {
   const tmp = mkdtempSync(join(tmpdir(), 'overlay-test-noop-'));
   try {
     // pulls 成功、runs 成功但为空数组 = 真的没有成功 CI Run → 必须保持 no-op，不得被 fail-loud 误伤。
