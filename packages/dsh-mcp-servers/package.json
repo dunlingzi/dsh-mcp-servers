@@ -78,11 +78,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/wingsky-1/dsh-mcp-servers.git",
+    "url": "https://github.com/dunlingzi/dsh-mcp-servers.git",
     "directory": "packages/dsh-mcp-servers"
   },
   "bugs": {
-    "url": "https://github.com/wingsky-1/dsh-mcp-servers/issues"
+    "url": "https://github.com/dunlingzi/dsh-mcp-servers/issues"
   },
   "keywords": [
     "dsh",
