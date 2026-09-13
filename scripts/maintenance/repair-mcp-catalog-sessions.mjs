@@ -15,7 +15,7 @@
  * 那几处 source 就地改写成宿主认可的形态（与插件 0.3+ 写入的形态一致）：
  *
  *   旧：{ kind: "mcp-catalog", form: "catalog", entries }
- *   新：{ kind: "plugin", plugin: "@wingsky-1/dsh-mcp-servers",
+ *   新：{ kind: "plugin", plugin: "@dunlingzi/dsh-mcp-servers",
  *         form: "snapshot", sections: [{ name: "mcp-catalog", text: <原消息正文> }] }
  *
  * 只改 source 的元数据，正文与事件序列一律不动；改完的产物仍是合法 v0/v1/v2，
@@ -43,7 +43,7 @@ import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 /** 插件身份：与 src/catalog/entries.ts 的 CATALOG_SOURCE_PLUGIN 同源（发布物内联，无法 import）。 */
-export const CATALOG_SOURCE_PLUGIN = "@wingsky-1/dsh-mcp-servers";
+export const CATALOG_SOURCE_PLUGIN = "@dunlingzi/dsh-mcp-servers";
 /** 目录快照段名：与 src/catalog/entries.ts 的 CATALOG_SECTION_NAME 同源。 */
 export const CATALOG_SECTION_NAME = "mcp-catalog";
 /** 旧形态的 source.kind（本脚本的匹配条件）。 */

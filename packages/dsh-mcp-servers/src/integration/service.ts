@@ -3,7 +3,7 @@
  *
  * 类型面唯一事实源在 shared/mcp-servers-service.d.ts（本包 re-export 之）；
  * 本文件只做类型 re-export + cordis Context 声明合并。消费方插件
- * **从本包引类型**（`import type { McpServersService } from "@wingsky-1/dsh-mcp-servers"`），
+ * **从本包引类型**（`import type { McpServersService } from "@dunlingzi/dsh-mcp-servers"`），
  * 依赖经 package.json workspace:* 声明 + inject。
  *
  * 提供方：apply.ts 中 ctx.provide("mcpServers", service)。

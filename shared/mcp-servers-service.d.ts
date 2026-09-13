@@ -3,7 +3,7 @@
  *
  * 供 mcp-servers 提供方（src/integration/service.ts re-export + declare module 合并）
  * 与消费方插件引用——消费方**从 mcp-servers 包引类型**
- * （`import type { McpServersService } from "@wingsky-1/dsh-mcp-servers"`），
+ * （`import type { McpServersService } from "@dunlingzi/dsh-mcp-servers"`），
  * 本文件是类型定义的唯一事实源，mcp-servers 包 re-export 之。纯类型，
  * esbuild 构建期内联、随包复制（d.ts X1）。
  *

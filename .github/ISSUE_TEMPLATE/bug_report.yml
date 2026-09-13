@@ -12,8 +12,8 @@ body:
     id: plugin
     attributes:
       label: 受影响插件（包名）*
-      description: 如 @wingsky-1/dsh-notifier；不确定就填「不确定」。
-      placeholder: "@wingsky-1/dsh-notifier"
+      description: 如 @dunlingzi/dsh-notifier；不确定就填「不确定」。
+      placeholder: "@dunlingzi/dsh-notifier"
     validations:
       required: true
   - type: dropdown
@@ -42,8 +42,8 @@ body:
     id: plugin-version
     attributes:
       label: 插件版本*
-      description: 运行 `dsh plugin --profile web list @wingsky-1/<插件名>` 后，贴出 `@wingsky-1/<插件名>@x.y.z` 那一行（版本号最关键）。
-      placeholder: "@wingsky-1/dsh-notifier@0.1.8"
+      description: 运行 `dsh plugin --profile web list @dunlingzi/<插件名>` 后，贴出 `@dunlingzi/<插件名>@x.y.z` 那一行（版本号最关键）。
+      placeholder: "@dunlingzi/dsh-notifier@0.1.8"
     validations:
       required: true
   - type: input

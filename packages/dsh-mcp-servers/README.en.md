@@ -1,5 +1,5 @@
-# @wingsky-1/dsh-mcp-servers
-[![npm](https://img.shields.io/npm/v/@wingsky-1/dsh-mcp-servers)](https://www.npmjs.com/package/@wingsky-1/dsh-mcp-servers)
+# @dunlingzi/dsh-mcp-servers
+[![npm](https://img.shields.io/npm/v/@dunlingzi/dsh-mcp-servers)](https://www.npmjs.com/package/@dunlingzi/dsh-mcp-servers)
 
 An **MCP server manager plugin** for DSH (DeepSeek Harness): a dedicated
 "MCP Servers" page in the Settings sidebar, showing every MCP server grouped by
@@ -42,15 +42,15 @@ streamable-http), inlined at build time with zero runtime dependencies.
 Requires DeepSeek Harness with `dsh web` running.
 
 ```sh
-dsh plugin --profile web add @wingsky-1/dsh-mcp-servers      # install
-dsh plugin --profile web update @wingsky-1/dsh-mcp-servers   # update
-dsh plugin --profile web remove @wingsky-1/dsh-mcp-servers   # remove
+dsh plugin --profile web add @dunlingzi/dsh-mcp-servers      # install
+dsh plugin --profile web update @dunlingzi/dsh-mcp-servers   # update
+dsh plugin --profile web remove @dunlingzi/dsh-mcp-servers   # remove
 ```
 
 Without a global `dsh` binary, use `npx`:
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add @wingsky-1/dsh-mcp-servers
+npx @deepseek-ai/dsh plugin --profile web add @dunlingzi/dsh-mcp-servers
 ```
 
 > Restart `dsh web` once after install/update/remove (bundles compose at
@@ -149,7 +149,7 @@ await ctx.mcpServers.registerServer({
   `dsh-mcp-servers.debug.callStats: true` in `~/.dsh/settings.yaml` — metrics are
   persisted atomically to `<DSH_HOME>/mcp-stats.json`, never user arguments or content
 - Catalog injection messages use the host-registered generic source form
-  (`{ kind: "plugin", plugin: "@wingsky-1/dsh-mcp-servers", form: "snapshot", ... }`),
+  (`{ kind: "plugin", plugin: "@dunlingzi/dsh-mcp-servers", form: "snapshot", ... }`),
   avoiding the session-format migration rejection caused by custom `source.kind` values (#723)
 
 ## Testing
@@ -157,8 +157,8 @@ await ctx.mcpServers.registerServer({
 ```sh
 curl -s http://127.0.0.1:3080/api/dsh-mcp-servers/health
 
-pnpm --filter @wingsky-1/dsh-mcp-servers build
-pnpm --filter @wingsky-1/dsh-mcp-servers test
+pnpm --filter @dunlingzi/dsh-mcp-servers build
+pnpm --filter @dunlingzi/dsh-mcp-servers test
 ```
 
 ## Known limitations

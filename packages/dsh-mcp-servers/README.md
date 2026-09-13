@@ -1,5 +1,5 @@
-# @wingsky-1/dsh-mcp-servers
-[![npm](https://img.shields.io/npm/v/@wingsky-1/dsh-mcp-servers)](https://www.npmjs.com/package/@wingsky-1/dsh-mcp-servers)
+# @dunlingzi/dsh-mcp-servers
+[![npm](https://img.shields.io/npm/v/@dunlingzi/dsh-mcp-servers)](https://www.npmjs.com/package/@dunlingzi/dsh-mcp-servers)
 
 DSH（DeepSeek Harness）的 **MCP 服务器管理插件**：设置左侧菜单「MCP 服务器」独立页面，
 分级展示全部 MCP 服务器（运行中 / 连接中 / 重连中 / 未连接 / 已停用 / 失败），
@@ -36,19 +36,19 @@ MCP 协议客户端基于官方 SDK 传输层（stdio 子进程 + streamable-htt
 ### 安装插件（add）
 
 ```sh
-dsh plugin --profile web add @wingsky-1/dsh-mcp-servers
+dsh plugin --profile web add @dunlingzi/dsh-mcp-servers
 ```
 
 ### 卸载插件（remove）
 
 ```sh
-dsh plugin --profile web remove @wingsky-1/dsh-mcp-servers
+dsh plugin --profile web remove @dunlingzi/dsh-mcp-servers
 ```
 
 ### 更新插件（update）
 
 ```sh
-dsh plugin --profile web update @wingsky-1/dsh-mcp-servers
+dsh plugin --profile web update @dunlingzi/dsh-mcp-servers
 ```
 
 > 安装 / 卸载 / 更新后都需**重启一次** `dsh web`（bundle 层只在启动时组合）生效。
@@ -59,9 +59,9 @@ dsh plugin --profile web update @wingsky-1/dsh-mcp-servers
 若本机没有全局 `dsh` 命令，用 `npx` 临时拉起（底层调用 `pnpm`，仍需本机装好 `pnpm` 与 `Node.js`）：
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add @wingsky-1/dsh-mcp-servers
-npx @deepseek-ai/dsh plugin --profile web remove @wingsky-1/dsh-mcp-servers
-npx @deepseek-ai/dsh plugin --profile web update @wingsky-1/dsh-mcp-servers
+npx @deepseek-ai/dsh plugin --profile web add @dunlingzi/dsh-mcp-servers
+npx @deepseek-ai/dsh plugin --profile web remove @dunlingzi/dsh-mcp-servers
+npx @deepseek-ai/dsh plugin --profile web update @dunlingzi/dsh-mcp-servers
 ```
 
 ## 使用（设置 → MCP 服务器）
@@ -166,7 +166,7 @@ await ctx.mcpServers.registerServer({
   中配置 `dsh-mcp-servers.debug.callStats: true`，将把 MCP 调用指标防抖原子持久化至
   `<DSH_HOME>/mcp-stats.json`；严格不持久化用户 arguments 与返回 content
 - **能力目录注入的消息来源形态**：`source` 用宿主已登记的通用形态
-  `{ kind: "plugin", plugin: "@wingsky-1/dsh-mcp-servers", form: "snapshot", ... }`，
+  `{ kind: "plugin", plugin: "@dunlingzi/dsh-mcp-servers", form: "snapshot", ... }`，
   自造 `source.kind` 会被 dsh 的 session format v2→v3 迁移闸门拒绝（#723 同类问题，
   本插件写入侧已按宿主词表实现，不引入该缺陷）
 
@@ -180,8 +180,8 @@ stryker 经 lib→src hook 复用同一份断言，无需手工同步副本。
 curl -s http://127.0.0.1:3080/api/dsh-mcp-servers/health
 
 # 源码在 src/，改后必须 build
-pnpm --filter @wingsky-1/dsh-mcp-servers build
-pnpm --filter @wingsky-1/dsh-mcp-servers test
+pnpm --filter @dunlingzi/dsh-mcp-servers build
+pnpm --filter @dunlingzi/dsh-mcp-servers test
 ```
 
 ## 已知限制

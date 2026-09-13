@@ -61,7 +61,7 @@ jobs:
         run: |
           set -e
           if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
-            echo "::error::NPM_TOKEN secret 未配置——发布中止（仓库 Settings → Secrets and variables → Actions 配置 @wingsky-1 scope 的 npm automation token）"
+            echo "::error::NPM_TOKEN secret 未配置——发布中止（仓库 Settings → Secrets and variables → Actions 配置 @dunlingzi scope 的 npm automation token）"
             exit 1
           fi
           echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc

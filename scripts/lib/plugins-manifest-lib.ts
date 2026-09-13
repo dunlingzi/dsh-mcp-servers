@@ -15,7 +15,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 export const AGGREGATE_NAME = 'dsh-plugins-all'
-export const NPM_SCOPE = '@wingsky-1/'
+export const NPM_SCOPE = '@dunlingzi/'
 export const MANIFEST_PATH_SEGMENTS = ['scripts', 'data', 'plugins-manifest.json']
 const NAME_RE = /^dsh-[a-z0-9-]+$/
 

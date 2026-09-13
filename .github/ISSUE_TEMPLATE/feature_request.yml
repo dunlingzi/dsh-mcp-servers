@@ -7,8 +7,8 @@ body:
     id: plugin
     attributes:
       label: 相关插件（包名，可选）
-      description: 如 @wingsky-1/dsh-notifier；通用建议可留空。
-      placeholder: "@wingsky-1/dsh-notifier"
+      description: 如 @dunlingzi/dsh-notifier；通用建议可留空。
+      placeholder: "@dunlingzi/dsh-notifier"
     validations:
       required: false
   - type: textarea

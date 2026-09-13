@@ -29,7 +29,7 @@ const flag = (name) => {
   const i = argv.indexOf(name)
   return i === -1 ? undefined : argv[i + 1]
 }
-const REPO = 'wingsky-1/dsh-plugin-hub'
+const REPO = 'dunlingzi/dsh-mcp-servers'
 
 function ghJson(args) {
   try {

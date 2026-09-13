@@ -24,7 +24,7 @@ const ACTIVE = ['dsh-alpha', 'dsh-beta']
 const MANIFEST = {
   active: ACTIVE,
   retired: [
-    { name: 'dsh-gone', reason: '测试退役', successor: '@wingsky-1/dsh-alpha' },
+    { name: 'dsh-gone', reason: '测试退役', successor: '@dunlingzi/dsh-alpha' },
   ],
 }
 
@@ -44,28 +44,28 @@ function fixtureRepo(manifestObj) {
   return { dir, cleanup }
 }
 
-const EXPECTED_DEPS = { '@wingsky-1/dsh-alpha': 'workspace:*', '@wingsky-1/dsh-beta': 'workspace:*' }
+const EXPECTED_DEPS = { '@dunlingzi/dsh-alpha': 'workspace:*', '@dunlingzi/dsh-beta': 'workspace:*' }
 
 test('#1 deps 多一行（退役包）→ 命中 retired 分支文案', () => {
   const problems = checkAggregateConsistency({
     dirNames: ACTIVE,
     manifest: MANIFEST,
-    aggDeps: { ...EXPECTED_DEPS, '@wingsky-1/dsh-gone': 'workspace:*' },
+    aggDeps: { ...EXPECTED_DEPS, '@dunlingzi/dsh-gone': 'workspace:*' },
     aggPatchIds: ['ui-dsh-alpha', 'ui-dsh-beta'],
   })
   assert.equal(problems.length, 1)
-  assert.match(problems[0], /多出已退役包 @wingsky-1\/dsh-gone/)
+  assert.match(problems[0], /多出已退役包 @dunlingzi\/dsh-gone/)
 })
 
 test('#2 deps 多一行（未收录名）→ 命中「既不在 active 也不在 retired」分支', () => {
   const problems = checkAggregateConsistency({
     dirNames: ACTIVE,
     manifest: MANIFEST,
-    aggDeps: { ...EXPECTED_DEPS, '@wingsky-1/dsh-typo': 'workspace:*' },
+    aggDeps: { ...EXPECTED_DEPS, '@dunlingzi/dsh-typo': 'workspace:*' },
     aggPatchIds: ['ui-dsh-alpha', 'ui-dsh-beta'],
   })
   assert.equal(problems.length, 1)
-  assert.match(problems[0], /多出未收录包 @wingsky-1\/dsh-typo/)
+  assert.match(problems[0], /多出未收录包 @dunlingzi\/dsh-typo/)
 })
 
 test('#3 patch 少一行 → 报缺失 id（回归保护）', () => {
@@ -110,11 +110,11 @@ test('#4b 目录有包但只在 standalone → 双向通过；聚合 deps 误引
   const problems = checkAggregateConsistency({
     dirNames: [...ACTIVE, 'dsh-demo'],
     manifest,
-    aggDeps: { ...EXPECTED_DEPS, '@wingsky-1/dsh-demo': 'workspace:*' },
+    aggDeps: { ...EXPECTED_DEPS, '@dunlingzi/dsh-demo': 'workspace:*' },
     aggPatchIds: ['ui-dsh-alpha', 'ui-dsh-beta'],
   })
   assert.equal(problems.length, 1)
-  assert.match(problems[0], /多出独立发包 @wingsky-1\/dsh-demo/)
+  assert.match(problems[0], /多出独立发包 @dunlingzi\/dsh-demo/)
 })
 
 test('#4c 退役残留目录（manifest.retired 已登记）→ 方向 B 豁免不判红（T1）', () => {

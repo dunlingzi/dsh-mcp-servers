@@ -43,7 +43,7 @@ export const DEFAULT_CATALOG_MAX_ENTRIES = 6;
  * （`dsh-time-context` / `dsh-tmux-context`）走的就是 `plugin` + 身份 + snapshot
  * 形态，这里与之一致：形态由宿主校验，身份由本包判定。
  */
-export const CATALOG_SOURCE_PLUGIN = "@wingsky-1/dsh-mcp-servers";
+export const CATALOG_SOURCE_PLUGIN = "@dunlingzi/dsh-mcp-servers";
 /** 目录快照的段名（snapshot 形态下承载渲染后的目录正文）。 */
 export const CATALOG_SECTION_NAME = "mcp-catalog";
 

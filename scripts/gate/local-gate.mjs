@@ -56,7 +56,7 @@ function resolveChangedFiles(base) {
 /** 每个步骤 = { label, args }；args 交给 pnpm。 */
 function tierSteps(tier, { hitPackages, withCoverage }) {
   const pkgFilters = hitPackages.map((p) => `./packages/${p}`)
-  const scopedBuild = hitPackages.map((p) => `@wingsky-1/${p}...`)
+  const scopedBuild = hitPackages.map((p) => `@dunlingzi/${p}...`)
   const scopeArg = hitPackages.join(',')
 
   if (tier === 'changed') {
@@ -85,8 +85,8 @@ function tierSteps(tier, { hitPackages, withCoverage }) {
   const prereqStep = {
     label: `build 编译面前置包（test:scripts 依赖：${PREREQ_PACKAGES.join(', ')}）`,
     // --filter 与取值必须是两个独立 argv 元素（与本文件其余步骤同写法）；拼成单个
-    // 字符串会被 pnpm 当成一个未知选项：Unknown options: 'filter @wingsky-1/<pkg>...'
-    args: [...PREREQ_PACKAGES.flatMap((p) => ['--filter', `@wingsky-1/${p}...`]), 'build'],
+    // 字符串会被 pnpm 当成一个未知选项：Unknown options: 'filter @dunlingzi/<pkg>...'
+    args: [...PREREQ_PACKAGES.flatMap((p) => ['--filter', `@dunlingzi/${p}...`]), 'build'],
   }
   const scriptsSelfTest = { label: 'test:scripts（门禁脚本自测）', args: ['test:scripts'] }
 

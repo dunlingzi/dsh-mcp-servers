@@ -8,7 +8,7 @@
 ## 0. 提交 issue 之前
 
 1. **先升级再报告**：很多缺陷在最新版已修。请先
-   `dsh plugin --profile web update @wingsky-1/<插件>` 升到 latest 再确认问题仍在。
+   `dsh plugin --profile web update @dunlingzi/<插件>` 升到 latest 再确认问题仍在。
 2. **搜索既有 issue**：同问题不重复开，在原 issue 下补充信息即可。
 3. **选对模板**：
    - 缺陷（崩溃 / 功能异常 / 平台兼容）→ **Bug 报告** 表单（`[bug]` 前缀）

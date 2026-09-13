@@ -23,7 +23,7 @@
 
 ```sh
 pnpm install
-pnpm --filter @wingsky-1/dsh-mcp-servers build && pnpm --filter @wingsky-1/dsh-mcp-servers test
+pnpm --filter @dunlingzi/dsh-mcp-servers build && pnpm --filter @dunlingzi/dsh-mcp-servers test
 node scripts/gate/contract-check.ts && node scripts/gate/pack-check.ts
 ```
 

@@ -249,7 +249,7 @@ describe("renderMcpCatalogMessage / findCatalogMessage / readCatalogEntries", ()
   it("#723 message.source 为宿主词表内的 plugin/snapshot 形态（自造 kind 会被迁移白名单拒绝）", () => {
     const source = makeMessage().source;
     expect(source.kind).toBe("plugin");
-    expect(source.plugin).toBe("@wingsky-1/dsh-mcp-servers");
+    expect(source.plugin).toBe("@dunlingzi/dsh-mcp-servers");
     expect(source.form).toBe("snapshot");
     expect(isCatalogSource(source)).toBe(true);
   });
@@ -538,8 +538,8 @@ describe("#723 目录 source 双形态识别", () => {
     expect(resolveCatalogEntries(undefined)).toBeUndefined();
     expect(resolveCatalogEntries({ kind: "user" })).toBeUndefined();
     expect(resolveCatalogEntries({ kind: "plugin", plugin: "other-plugin", form: "snapshot", sections: [] })).toBeUndefined();
-    expect(resolveCatalogEntries({ kind: "plugin", plugin: "@wingsky-1/dsh-mcp-servers", form: "snapshot" })).toBeUndefined();
-    expect(resolveCatalogEntries({ kind: "plugin", plugin: "@wingsky-1/dsh-mcp-servers", form: "snapshot", sections: [{ name: "other", text: "x" }] })).toBeUndefined();
+    expect(resolveCatalogEntries({ kind: "plugin", plugin: "@dunlingzi/dsh-mcp-servers", form: "snapshot" })).toBeUndefined();
+    expect(resolveCatalogEntries({ kind: "plugin", plugin: "@dunlingzi/dsh-mcp-servers", form: "snapshot", sections: [{ name: "other", text: "x" }] })).toBeUndefined();
   });
 });
 
@@ -553,7 +553,7 @@ describe("#723 catalogHistory 双形态识别", () => {
     "</available_mcp_servers>",
     "</system-reminder>",
   ].join("\n");
-  const newSource = { kind: "plugin", plugin: "@wingsky-1/dsh-mcp-servers", form: "snapshot", sections: [{ name: "mcp-catalog", text: body }] };
+  const newSource = { kind: "plugin", plugin: "@dunlingzi/dsh-mcp-servers", form: "snapshot", sections: [{ name: "mcp-catalog", text: body }] };
   const agentOf = (nodes, source) => ({
     session: { surface: { nodes }, snapshotEvents: () => [{ type: "user/message", seq: 1, data: { source } }] },
   });

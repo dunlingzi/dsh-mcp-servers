@@ -1976,7 +1976,7 @@ it("renderMcpCatalogMessage 结构与声明", () => {
   expect(msg.role).toBe("user");
   // #723：source 改为宿主词表内的通用形态（自造 kind 会被 dsh v2→v3 迁移的封闭白名单拒绝）
   expect(msg.source.kind).toBe("plugin");
-  expect(msg.source.plugin).toBe("@wingsky-1/dsh-mcp-servers");
+  expect(msg.source.plugin).toBe("@dunlingzi/dsh-mcp-servers");
   expect(msg.source.form).toBe("snapshot");
   expect(isCatalogSource(msg.source)).toBe(true);
   expect(msg.content[0].type).toBe("text");

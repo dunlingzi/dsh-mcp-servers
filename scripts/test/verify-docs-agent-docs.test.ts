@@ -28,7 +28,7 @@ function fixture({ agentFiles = {} } = {}) {
   writeFileSync(join(dir, 'packages/dsh-fake/README.md'), '# fake\n')
   writeFileSync(
     join(dir, 'packages/dsh-fake/package.json'),
-    JSON.stringify({ name: '@wingsky-1/dsh-fake', description: 'fixture' }),
+    JSON.stringify({ name: '@dunlingzi/dsh-fake', description: 'fixture' }),
   )
   for (const [rel, content] of Object.entries(agentFiles)) {
     const p = join(dir, rel)

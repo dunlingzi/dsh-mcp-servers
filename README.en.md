@@ -12,7 +12,7 @@ configuration reference and security model.
 
 ## TL;DR
 
-- Install: `dsh plugin --profile web add @wingsky-1/dsh-mcp-servers`, restart
+- Install: `dsh plugin --profile web add @dunlingzi/dsh-mcp-servers`, restart
   `dsh web` once
 - Use: open **Settings → MCP Servers** — list / create / edit / toggle /
   delete / test / middleware switch

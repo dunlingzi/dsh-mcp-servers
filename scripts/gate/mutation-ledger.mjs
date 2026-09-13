@@ -93,7 +93,7 @@ export function checkLedger(ledger, expected) {
 
 function ghRunMeta(runId) {
   try {
-    return JSON.parse(execFileSync('gh', ['run', 'view', String(runId), '--repo', 'wingsky-1/dsh-plugin-hub',
+    return JSON.parse(execFileSync('gh', ['run', 'view', String(runId), '--repo', 'dunlingzi/dsh-mcp-servers',
       '--json', 'databaseId,name,event,conclusion,createdAt,headSha'], { encoding: 'utf8' }))
   } catch (e) {
     console.error(`[ledger] 读取 run ${runId} 元数据失败：${String(e.message).split('\n')[0]}`)

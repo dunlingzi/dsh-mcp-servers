@@ -6,7 +6,7 @@
     "output": "mcp-manager-archify-overview.html",
     "quality_profile": "showcase",
     "repository": {
-      "url": "https://github.com/wingsky-1/dsh-plugin-hub",
+      "url": "https://github.com/dunlingzi/dsh-mcp-servers",
       "revision": "58334fadd28c7cdb5f5ee69043a708db970e28b0"
     },
     "views": [

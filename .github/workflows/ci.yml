@@ -165,7 +165,7 @@ jobs:
       # 全仓产物闸（含全部包 lib/index.js 齐备断言）只在 gate:full 标签 / 夜间跑。
       - name: Build package（仅命中包；未命中包本 job 只做 checkout+setup）
         if: contains(fromJSON(needs.changes.outputs.hitPackages), matrix.package)
-        run: pnpm --filter "@wingsky-1/${{ matrix.package }}"... build
+        run: pnpm --filter "@dunlingzi/${{ matrix.package }}"... build
 
       - name: Smoke tests（仅命中包；聚合包无 test 脚本由 --if-present 跳过）
         if: contains(fromJSON(needs.changes.outputs.hitPackages), matrix.package)
@@ -555,7 +555,7 @@ jobs:
         # test:scripts 内判红，而不是在这里静默少建一个包导致假红。
         run: |
           set -e
-          FILTERS=$(node -e "import(require('node:url').pathToFileURL('scripts/test/script-test-prereqs.mjs').href).then(m=>console.log(m.PREREQ_PACKAGES.map(p=>'--filter @wingsky-1/'+p+'...').join(' ')))")
+          FILTERS=$(node -e "import(require('node:url').pathToFileURL('scripts/test/script-test-prereqs.mjs').href).then(m=>console.log(m.PREREQ_PACKAGES.map(p=>'--filter @dunlingzi/'+p+'...').join(' ')))")
           echo "prereq filters: $FILTERS"
           pnpm $FILTERS build
 

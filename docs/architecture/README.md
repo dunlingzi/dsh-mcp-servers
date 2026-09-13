@@ -18,7 +18,7 @@
 | 插件 | 一句话定位 | 架构文档 |
 |---|---|---|
 | `@wingsky-1/dsh-lan-proxy` | 局域网访问 dsh web：HTTP/HTTPS/WS 转发 + TLS + 响应压缩 | [dsh-lan-proxy.md](dsh-lan-proxy.md) |
-| `@wingsky-1/dsh-mcp-servers` | MCP 服务器管理：stdio/HTTP 传输、工具注册、三档中间层收敛 | [dsh-mcp-servers.md](dsh-mcp-servers.md) |
+| `@dunlingzi/dsh-mcp-servers` | MCP 服务器管理：stdio/HTTP 传输、工具注册、三档中间层收敛 | [dsh-mcp-servers.md](dsh-mcp-servers.md) |
 | `@wingsky-1/dsh-notifier` | 审批/完成/错误事件通知：浏览器 Notification + 系统 toast + Bark | [dsh-notifier.md](dsh-notifier.md) |
 | `@wingsky-1/dsh-provider-usage` | 多 provider 用量统计：v2 适配器契约 + 宿主端渲染 + 历史落盘 | [dsh-provider-usage.md](dsh-provider-usage.md) |
 | `@wingsky-1/dsh-web-file-preview` | 把对话内「用默认应用打开」改写成官方右侧栏预览 | [dsh-web-file-preview.md](dsh-web-file-preview.md) |
@@ -31,7 +31,7 @@
 
 ```mermaid
 flowchart LR
-    subgraph npm["npm 分发（@wingsky-1/dsh-*）"]
+    subgraph npm["npm 分发（@dunlingzi/dsh-*）"]
         P1["dsh-lan-proxy"]
         P2["dsh-mcp-servers"]
         P3["dsh-notifier"]

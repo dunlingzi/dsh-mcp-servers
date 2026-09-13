@@ -8,7 +8,7 @@
 <a id="0-构建总览"></a><a id="user-content-0-构建总览"></a>
 ## 0. 构建总览
 
-每个插件包 = 独立 npm 包（`@wingsky-1/dsh-*`），发布物自包含（第三方依赖构建期内联）。
+每个插件包 = 独立 npm 包（`@dunlingzi/dsh-*`），发布物自包含（第三方依赖构建期内联）。
 
 > **安装依赖**：本仓库是 pnpm workspace（`pnpm-workspace.yaml` + 包间 `workspace:*`
 > 协议 + pnpm 严格 node_modules）。动手前必须 `pnpm install`（在仓库根执行）。
@@ -119,7 +119,7 @@ release.yml tag 管线跑全量门禁——全量只在这三处语义中的后�
 目录结构：
 
 ```text
-packages/dsh-*/            # 每个插件 = 独立 npm 包（@wingsky-1/dsh-*）
+packages/dsh-*/            # 每个插件 = 独立 npm 包（@dunlingzi/dsh-*）
   src/index.ts             # 宿主端入口（cordis service，export ROUTES 作客户端路由单一来源）
   src/client/index.ts      # 客户端干净模块入口（只 export apply/inject，无 load/IIFE 外壳）
   src/client/style.css     # 客户端样式（独立文件，构建期 text-loader 内联进 client.js）
@@ -461,7 +461,7 @@ export const inject: string[] = [];        // 声明 apply 用到的 ctx 服务�
   dsh-provider-usage / dsh-web-file-preview），判据面对全部包生效、不留切片。判据实现
   `scripts/lib/exports-types-lib.ts`——与导出面快照门禁**共用**「`exports[].types` → 产物
   相对路径」映射，但**判的是不同产物**（此处判 tarball，门禁判 emit 产物），故不是双轨；
-  消费方探针：隔离目录软链 `node_modules/@wingsky-1/<pkg>` → 包目录 + `--strict
+  消费方探针：隔离目录软链 `node_modules/@dunlingzi/<pkg>` → 包目录 + `--strict
   --moduleResolution bundler`，五包实测统一为「对照组主入口 exit=0 / 子路径修复前 TS7016 /
   修复后 TS2322」。
 - `assertClientSourceContract`（smoke-lib）：兼容三种产物形态（纯净 wrapper /

@@ -22,7 +22,7 @@ import { join } from 'node:path'
 import { buildClient } from '../build/build-client.ts'
 import { assertClientContract } from '../lib/client-contract-lib.ts'
 
-const PKG = '@wingsky-1/buildclient-test'
+const PKG = '@dunlingzi/buildclient-test'
 
 function tempDir() {
   const dir = mkdtempSync(join(tmpdir(), 'bc-test-'))

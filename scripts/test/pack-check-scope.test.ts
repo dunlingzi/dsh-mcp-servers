@@ -42,7 +42,7 @@ test('增量切片：命中登记包 → exit 0（产物就绪）', () => {
   const { status, stdout } = runPackCheck(['--packages', SLICE_PKG])
   assert.equal(status, 0, `增量切片应 exit 0，实际 ${status}\n${stdout}`)
   assert.match(stdout, /PASS plugins-manifest \| 目录集 == manifest\.active ∪ standalone 集/, 'manifest 一致性前置闸恒跑')
-  assert.match(stdout, new RegExp(`PASS @wingsky-1/${SLICE_PKG}`), `切片包 ${SLICE_PKG} 应逐包 PASS`)
+  assert.match(stdout, new RegExp(`PASS @dunlingzi/${SLICE_PKG}`), `切片包 ${SLICE_PKG} 应逐包 PASS`)
 })
 
 test('切片含未登记包名 → fail-loud（不得静默忽略）', () => {
@@ -55,6 +55,6 @@ test('全仓口径：exit 0（产物就绪时逐包全查）', () => {
   // 全仓口径只跑一次（真实 pack 各包，约 12-15s）：以下断言共享同一份输出。
   const { status, stdout } = runPackCheck([])
   assert.equal(status, 0, `全仓口径应 exit 0，实际 ${status}\n${stdout}`)
-  assert.match(stdout, new RegExp(`PASS @wingsky-1/${SLICE_PKG}`), '全仓口径逐包 PASS')
+  assert.match(stdout, new RegExp(`PASS @dunlingzi/${SLICE_PKG}`), '全仓口径逐包 PASS')
   assert.doesNotMatch(stdout, /FAIL /, '全仓口径不得有 FAIL 行')
 })

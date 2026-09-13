@@ -140,5 +140,5 @@ test('真实包：全部客户端包的 exports 子路径与 types 指向 emit �
 test('端到端：真实仓库 pack-check 切片 → exit 0（判据挂在既有 pack:check 上）', () => {
   const r = spawnSync(process.execPath, [PACK_CHECK, '--packages', 'dsh-mcp-servers'], { cwd: ROOT, encoding: 'utf8', timeout: 300000 })
   assert.equal(r.status, 0, `期望 exit 0，实际 ${r.status}\n${r.stdout}\n${r.stderr}`)
-  assert.match(r.stdout, /PASS @wingsky-1\/dsh-mcp-servers \| tarball 完整/)
+  assert.match(r.stdout, /PASS @dunlingzi\/dsh-mcp-servers \| tarball 完整/)
 })

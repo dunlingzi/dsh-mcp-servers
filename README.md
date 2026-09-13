@@ -9,7 +9,7 @@ DeepSeek Harness（DSH）的 **MCP 服务器管理插件**：在 `dsh web` 设�
 
 ## 一句话
 
-- 装：`dsh plugin --profile web add @wingsky-1/dsh-mcp-servers`，重启一次 `dsh web`
+- 装：`dsh plugin --profile web add @dunlingzi/dsh-mcp-servers`，重启一次 `dsh web`
 - 用：打开 **设置 → MCP 服务器**——列表 / 新建 / 编辑 / 启停 / 删除 / 测试 / 中间层切换
 - 省上下文：项目级 MCP 经 `ws_mcp_list / detail / search / call` 四原子工具访问，
   接多少台服务器都不膨胀系统提示词

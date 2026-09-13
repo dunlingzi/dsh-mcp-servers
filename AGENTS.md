@@ -105,7 +105,7 @@ worktree 建在仓库外的独立路径（分支名 `/` → `-`），不建在�
 - **客户端是干净模块**：只 `export function apply(ctx)` + `export const inject`，样式独立
   `src/client/style.css`，路由强制 loopback 围栏，patch id 用 `ui-<name>`；细则见
   [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
-- **命名**：包目录 `dsh-` 前缀，npm 包名 `@wingsky-1/dsh-*`；本仓库 cordis 插件名为
+- **命名**：包目录 `dsh-` 前缀，npm 包名 `@dunlingzi/dsh-*`；本仓库 cordis 插件名为
   `mcp-servers`，设置页 section id 为 `mcp-servers`。
 - **与 dsh-mcp-manager 互斥**：两者共享 `<DSH_HOME>/dsh-mcp.json` 配置与
   `ws_mcp_*` / `mcp__` 工具面，同装会双注册冲突——文档与 FAQ 必须维持该声明。

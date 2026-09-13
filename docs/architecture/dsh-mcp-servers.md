@@ -1,6 +1,6 @@
 # dsh-mcp-servers 架构与运行机制（图解）
 
-> 包：`@wingsky-1/dsh-mcp-servers` · 源码：`packages/dsh-mcp-servers/` · 版本：0.2.0
+> 包：`@dunlingzi/dsh-mcp-servers` · 源码：`packages/dsh-mcp-servers/` · 版本：0.2.0
 > 功能一句话：**DSH 的 MCP 服务器管理器**——管理 stdio / streamable-http 两种传输的
 > MCP 服务器，把已连接服务器的工具注册给模型，并提供三档中间层模式把项目级工具面
 > 收敛为四个原子工具（`ws_mcp_list` / `ws_mcp_detail` / `ws_mcp_search` / `ws_mcp_call`）。
