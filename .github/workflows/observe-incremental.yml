@@ -1,17 +1,18 @@
 name: Observe (incremental)
 
-# #433 调度重设计 + #572 孤立分支基线：每日四班次增量班（北京 12/16/20/24 = UTC 04/08/12/16）。
+# #433 调度重设计 + #572 孤立分支基线：增量变异班。
 # - 基于孤立分支 refs/heads/baseline/mutation 拉取最新基线跑增量变异（快）；
 # - 变异产物由 orphan-baseline.mjs push 强推至孤立分支 baseline/mutation；
 # - 职责收敛：本班次不跑 cov / crap / observe-check 报告，
 #   只做「恢复基线 → 增量变异 → 推送孤立基线」。
 # - #572 方案：基线走孤立分支，彻底剥离 main 分支代码树巨型 JSON 与自动 PR 噪音。
+#
+# 私有仓库 Actions 分钟计费：每日四班定时有界增量在免费额度下成本过高
+# （2026-09-13 实测：全量班 ~60min，增量班 8~49min/班），2026-09-14 起改为
+# 仅手动触发（workflow_dispatch），日常变异守护由每日全量班 observe.yml 承担；
+# 大改动合入前可手动跑一次本班次预演增量。
 
 on:
-  schedule:
-    # 每日四班次增量变异与基线刷新（#433 调度重设计）：北京 12:00/16:00/20:00/24:00
-    # = UTC 04:00/08:00/12:00/16:00，均避开整点 Actions 高峰；全量班见 observe.yml
-    - cron: '0 4,8,12,16 * * *'
   workflow_dispatch:
 
 permissions:

@@ -14,8 +14,8 @@
  *   - observe.yml：全量班调度（北京次日 04:00）、覆盖率硬校验执行点（#722 阶段三起
  *     并入 pnpm cov 的 vitest coverage.thresholds）在位、self-cov 执行点不得回潮；
  *     全量清单 ↔ stryker.conf.d 文件集 ↔ gauntlet mutation.packages 三方一致
- *   - observe-incremental.yml：增量班调度（北京 12/16/20/24）、无日期闸、
- *     有变化即 PR、不跑覆盖校验
+ *   - observe-incremental.yml：增量班仅手动触发（私有仓计费分钟约束）、无日期闸、
+ *     不跑覆盖校验
  *   - changes 的 case 映射覆盖全部包（防新增包静默漏检，评审 F7）
  *   - #187 触发面收敛：mutation-gate 仅限 pull_request；repo-gate 判定走
  *     scripts/gate/repo-gate-assert.mjs 并以判定表全组合单测锁死
@@ -241,7 +241,7 @@ test('#322: 每个带 stryker 配置的包在 path-filter 均有段配置通配�
   }
 })
 
-test('#433+#572 调度重设计与孤立分支基线: observe 全量班（北京次日 04:00）+ 增量班四班次（强推孤立分支）', () => {
+test('#433+#572 调度重设计与孤立分支基线: observe 全量班（北京次日 04:00）+ 增量班仅手动触发（强推孤立分支）', () => {
   // ── 全量班（observe.yml）：每日一次，北京次日 04:00 = UTC 20:00 ──
   assert.ok(OBSERVE.includes("'0 20 * * *'"),
     '全量班 cron 必须为每日一次 UTC 20:00（北京次日 04:00）')
@@ -254,9 +254,10 @@ test('#433+#572 调度重设计与孤立分支基线: observe 全量班（北京
   assert.ok(!OBSERVE.includes('skip_pr=true'), '#572：全量班已迁移至孤立分支，日期闸与 PR 步骤已退役')
   assert.ok(OBSERVE.includes('orphan-baseline.mjs push'), '全量班调用 orphan-baseline.mjs push 提交孤立分支')
 
-  // ── 增量班（observe-incremental.yml）：每日四班次，北京 12/16/20/24 = UTC 04/08/12/16 ──
-  assert.ok(OBSERVE_INC.includes("'0 4,8,12,16 * * *'"),
-    '增量班 cron 必须为每日四班次（UTC 04/08/12/16 = 北京 12/16/20/次日 0 点）')
+  // ── 增量班（observe-incremental.yml）：仅手动触发（私有仓 Actions 分钟计费，
+  // 2026-09-14 起停定时有界班；日常变异守护由每日全量班承担）──
+  assert.ok(!OBSERVE_INC.includes('schedule:'),
+    '增量班不得有定时调度（私有仓计费分钟约束；误回潮会静默烧穿免费额度）')
   assert.ok(OBSERVE_INC.includes('workflow_dispatch'), '增量班支持手动 dispatch')
   assert.ok(OBSERVE_INC.includes('Resolve mutation suites'), '增量班 suite-plan 步骤在位')
   assert.ok(OBSERVE_INC.includes('orphan-baseline.mjs push'), '增量班调用 orphan-baseline.mjs push 强推孤立分支')

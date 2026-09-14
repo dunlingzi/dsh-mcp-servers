@@ -166,7 +166,7 @@ for (const r of rows) {
   );
 }
 lines.push('');
-lines.push(`mutation.strict = **${mutationStrict}**（false 时低阈仅标注不判红；provider-usage 二阶段达标后开启）`);
+lines.push(`mutation.strict = **${mutationStrict}**（false 时低阈仅标注不判红；true 时任一包低于 threshold 即运行失败并建 issue）`);
 lines.push('');
 lines.push('> 数据来源：`coverage/mutation/*.json`（Stryker JSON reporter）与本仓 `gauntlet.config.json` 基线；covered 口径 = (killed+timeout)/(killed+timeout+survived)。');
 

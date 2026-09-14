@@ -1,12 +1,93 @@
 {
-  "$comment": "变异段实测台账——由 scripts/gate/mutation-ledger.mjs 从 Actions run 日志解析生成，禁止手工编造数值。本仓库自 dsh-plugin-hub 拆出后台账从零起记：六段（entry/manager/middleware/routes/runtime/supervisor）均登记进 unmeasured（附理由），由 observe 班次首跑后按测量值填充。",
-  "measurements": [],
-  "unmeasured": {
-    "dsh-mcp-servers-entry": "拆出后首夜未测（observe 班次按 conf 段集合重建测量值）",
-    "dsh-mcp-servers-manager": "拆出后首夜未测（observe 班次按 conf 段集合重建测量值）",
-    "dsh-mcp-servers-middleware": "拆出后首夜未测（observe 班次按 conf 段集合重建测量值）",
-    "dsh-mcp-servers-routes": "拆出后首夜未测（observe 班次按 conf 段集合重建测量值）",
-    "dsh-mcp-servers-runtime": "拆出后首夜未测（observe 班次按 conf 段集合重建测量值）",
-    "dsh-mcp-servers-supervisor": "拆出后首夜未测（observe 班次按 conf 段集合重建测量值）"
-  }
+  "$comment": "变异段实测台账——由 scripts/gate/mutation-ledger.mjs 从 Actions run 日志解析生成，禁止手工编造数值。本仓库自 dsh-plugin-hub 拆出后台账从零起记；2026-09-14 由拆出后首个全量班（run 34785597680）填充六段测量值。",
+  "measurements": [
+    {
+      "run": {
+        "id": 34785597680,
+        "workflow": "Observe (nightly)",
+        "event": "schedule",
+        "conclusion": "success",
+        "createdAt": "2026-09-13T22:02:51Z",
+        "headSha": "aa9fcc2b11ab3662f496dc88cc6a45dfbdc8d5c1"
+      },
+      "scope": "full",
+      "measuredAt": "2026-09-14T05:06:29.219Z",
+      "logSource": "gh run view 34785597680 --log",
+      "segments": [
+        {
+          "seg": "dsh-mcp-servers-entry",
+          "startedAt": "2026-09-13T22:04:19.9929663",
+          "endedAt": "2026-09-13T22:09:37.6308021",
+          "wallSeconds": 317.6,
+          "mutants": 443,
+          "dryTests": 893,
+          "dryRunSeconds": 57,
+          "reused": null,
+          "reuseTotal": null,
+          "strykerReported": "5 minutes and 15 seconds"
+        },
+        {
+          "seg": "dsh-mcp-servers-manager",
+          "startedAt": "2026-09-13T22:09:37.6332632",
+          "endedAt": "2026-09-13T22:20:10.0622874",
+          "wallSeconds": 632.4,
+          "mutants": 1013,
+          "dryTests": 893,
+          "dryRunSeconds": 56,
+          "reused": null,
+          "reuseTotal": null,
+          "strykerReported": "10 minutes and 30 seconds"
+        },
+        {
+          "seg": "dsh-mcp-servers-middleware",
+          "startedAt": "2026-09-13T22:20:10.0640429",
+          "endedAt": "2026-09-13T22:31:27.1937025",
+          "wallSeconds": 677.1,
+          "mutants": 1646,
+          "dryTests": 893,
+          "dryRunSeconds": 56,
+          "reused": null,
+          "reuseTotal": null,
+          "strykerReported": "11 minutes and 15 seconds"
+        },
+        {
+          "seg": "dsh-mcp-servers-routes",
+          "startedAt": "2026-09-13T22:31:27.1951844",
+          "endedAt": "2026-09-13T22:34:05.7593021",
+          "wallSeconds": 158.6,
+          "mutants": 553,
+          "dryTests": 893,
+          "dryRunSeconds": 56,
+          "reused": null,
+          "reuseTotal": null,
+          "strykerReported": "2 minutes and 37 seconds"
+        },
+        {
+          "seg": "dsh-mcp-servers-runtime",
+          "startedAt": "2026-09-13T22:34:05.7608413",
+          "endedAt": "2026-09-13T22:50:35.4929483",
+          "wallSeconds": 989.7,
+          "mutants": 1836,
+          "dryTests": 893,
+          "dryRunSeconds": 57,
+          "reused": null,
+          "reuseTotal": null,
+          "strykerReported": "16 minutes and 28 seconds"
+        },
+        {
+          "seg": "dsh-mcp-servers-supervisor",
+          "startedAt": "2026-09-13T22:50:35.4947172",
+          "endedAt": "2026-09-13T23:02:28.6435930",
+          "wallSeconds": 713.1,
+          "mutants": 1154,
+          "dryTests": 893,
+          "dryRunSeconds": 56,
+          "reused": null,
+          "reuseTotal": null,
+          "strykerReported": "11 minutes and 51 seconds"
+        }
+      ]
+    }
+  ],
+  "unmeasured": {}
 }

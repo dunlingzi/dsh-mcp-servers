@@ -157,13 +157,16 @@ jobs:
           TITLE="chore(observe): 夜间质量报告 $(date -u +%Y-%m-%d)"
           EXISTING=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number --jq '.[0].number')
           if [ -n "$EXISTING" ]; then
+            NUM="$EXISTING"
             echo "issue #$EXISTING 已存在，跳过创建"
           else
-            gh issue create --title "$TITLE" --body-file observe-body.md
+            # 直接取 create 输出的 URL 提取编号——不二次 search：搜索索引对新建 issue
+            # 有延迟，run 34785597680 曾因此拿到空串（invalid issue format）丢单追评
+            CREATED_URL=$(gh issue create --title "$TITLE" --body-file observe-body.md)
+            NUM="${CREATED_URL##*/}"
           fi
           # F6 回落闭环：标记文件非空 = 存在指标回落 → 在当日 issue 上追加警示评论
           if [ -s observe-marker.txt ]; then
-            NUM=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number --jq '.[0].number')
             gh issue comment "$NUM" --body-file observe-marker.txt || true
           fi
 
