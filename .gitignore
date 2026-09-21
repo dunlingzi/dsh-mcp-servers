@@ -30,3 +30,7 @@ packages/*/undefined/
 
 # Mimosa 钩子会话状态（本地工具运行时产物，不入库）
 .mimosa/
+
+# peerfix / 重装类脚本留下的「改动前备份」（如 pin-desktop-peers-to-host.mjs 的 .bak-peerpin-<ts>），
+# 只在本机有参考价值，不入库；已归档的旧备份见 _archive/2026-09/2026-09-20_dirty-worktree-cleanup/03_备份/
+*.bak-*
