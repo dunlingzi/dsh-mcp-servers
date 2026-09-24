@@ -23,6 +23,8 @@ export {
   isCatalogSource,
   resolveCatalogEntries,
   CATALOG_SOURCE_PLUGIN,
+  CATALOG_SOURCE_KIND,
+  CATALOG_MIGRATED_KIND,
   CATALOG_SECTION_NAME,
 } from "./entries.ts";
 export type { CatalogEntry, SupervisorLite, CatalogCache, CatalogSourceLike } from "./entries.ts";

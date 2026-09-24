@@ -148,9 +148,10 @@ await ctx.mcpServers.registerServer({
 - **Call stats & debug mode (metadata-only)**: off by default; enable via
   `dsh-mcp-servers.debug.callStats: true` in `~/.dsh/settings.yaml` — metrics are
   persisted atomically to `<DSH_HOME>/mcp-stats.json`, never user arguments or content
-- Catalog injection messages use the host-registered generic source form
-  (`{ kind: "plugin", plugin: "@dunlingzi/dsh-mcp-servers", form: "snapshot", ... }`),
-  avoiding the session-format migration rejection caused by custom `source.kind` values (#723)
+- Catalog injection messages use the plugin's own producer source kind
+  (`{ kind: "dsh-mcp-servers", form: "snapshot", ... }`), replacing the removed host
+  `plugin` kind (dsh 0.1.7-rc.1); the read side stays compatible with the legacy
+  `plugin` / `mcp-catalog` and migrated `plugin:@dunlingzi/dsh-mcp-servers` forms (#723)
 
 ## Testing
 

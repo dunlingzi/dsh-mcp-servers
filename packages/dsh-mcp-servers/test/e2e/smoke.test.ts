@@ -1974,9 +1974,11 @@ it("renderMcpCatalogMessage 结构与声明", () => {
   // 含 project 条目 → 引导经 ws_mcp_search/ws_mcp_call（#228 双轨迁移）
   const msg = renderMcpCatalogMessage([{ name: "code-graph", text: "代码图谱", scope: "project" }]);
   expect(msg.role).toBe("user");
-  // #723：source 改为宿主词表内的通用形态（自造 kind 会被 dsh v2→v3 迁移的封闭白名单拒绝）
-  expect(msg.source.kind).toBe("plugin");
-  expect(msg.source.plugin).toBe("@dunlingzi/dsh-mcp-servers");
+  // DSH 0.1.7 起用本插件自有 producer kind：会话格式 v4 在写入/读取两侧都拒绝通用的
+  // `kind: "plugin"`（session-format-v3-to-v4/src/message-sources.ts 的
+  // assertV4*Source*Admission），且 MessageSourceMap 已删除 catch-all `plugin` 成员。
+  // 读侧 isCatalogSource 仍认历代形态（#723）。
+  expect(msg.source.kind).toBe("dsh-mcp-servers");
   expect(msg.source.form).toBe("snapshot");
   expect(isCatalogSource(msg.source)).toBe(true);
   expect(msg.content[0].type).toBe("text");
@@ -2225,8 +2227,8 @@ it("双缺省服务器目录消息可 append 为 user/message 且去重（#192 A
   const catalogEvents = agent.session.snapshotEvents().filter((e) => e.type === "user/message" && isCatalogSource(e.data?.source));
   expect(catalogEvents.length, "首轮注入成功（append 为 user/message 未被拒绝）").toBe(1);
   const appended = catalogEvents[0].data;
-  // #723：新形态 source 只含 plugin/snapshot sections，条目正文全在段文本里
-  expect(appended.source.kind).toBe("plugin");
+  // 0.1.7：新形态 source 只含自有 kind + snapshot sections，条目正文全在段文本里
+  expect(appended.source.kind).toBe("dsh-mcp-servers");
   expect(appended.source.form).toBe("snapshot");
   expect(appended.source.sections[0].text.includes("- `bare-only`"), "正文含双缺省服务器名").toBeTruthy();
   expect(() => JSON.stringify(appended), "事件载荷可 JSON 序列化（dsh-session 序列化校验等价物）").not.toThrow();

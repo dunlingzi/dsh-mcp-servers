@@ -165,10 +165,10 @@ await ctx.mcpServers.registerServer({
 - **调用统计与 Debug 模式（Metadata-Only）**：默认关闭；若在 `~/.dsh/settings.yaml`
   中配置 `dsh-mcp-servers.debug.callStats: true`，将把 MCP 调用指标防抖原子持久化至
   `<DSH_HOME>/mcp-stats.json`；严格不持久化用户 arguments 与返回 content
-- **能力目录注入的消息来源形态**：`source` 用宿主已登记的通用形态
-  `{ kind: "plugin", plugin: "@dunlingzi/dsh-mcp-servers", form: "snapshot", ... }`，
-  自造 `source.kind` 会被 dsh 的 session format v2→v3 迁移闸门拒绝（#723 同类问题，
-  本插件写入侧已按宿主词表实现，不引入该缺陷）
+- **能力目录注入的消息来源形态**：`source` 用**本包自有生产者 kind**
+  `{ kind: "dsh-mcp-servers", form: "snapshot", ... }`（0.1.7-rc.1 起，替代已删除的
+  宿主通用值 `plugin`）；读取侧仍兼容旧 `plugin` / `mcp-catalog` 形态与 v3→v4
+  迁移改写形态 `plugin:@dunlingzi/dsh-mcp-servers`（#723 跨版本兼容）
 
 ## 测试
 

@@ -34,16 +34,24 @@ export const DEFAULT_ANNOUNCE_CATALOG = true;
 export const DEFAULT_CATALOG_MAX_ENTRIES = 6;
 
 /**
- * 能力目录消息的来源身份（#723）：`source.kind` 只能是宿主已登记的通用值
- * `plugin`，本插件的身份由 `source.plugin` 承载。
+ * 能力目录消息的来源身份：写入侧用**本包自有生产者 kind** `dsh-mcp-servers`，
+ * 不再用宿主通用值 `plugin`。
  *
- * 为什么不再自造 `kind`：宿主 v2→v3 迁移对 surface 消息的 `source.kind` 有一份
- * 封闭白名单（`dsh-session-format-v2-to-v3` 的 `SOURCE_KINDS`），自造值会让升级前
- * 落盘的会话永久无法迁移（原件保留、每次加载同样失败）。官方上下文包
- * （`dsh-time-context` / `dsh-tmux-context`）走的就是 `plugin` + 身份 + snapshot
- * 形态，这里与之一致：形态由宿主校验，身份由本包判定。
+ * 历史：宿主 v2→v3 迁移对 surface 消息的 `source.kind` 有一份封闭白名单
+ * （`dsh-session-format-v2-to-v3` 的 `SOURCE_KINDS`），自造值会让升级前落盘的会话
+ * 永久无法迁移，故 0.3+ 曾用 `plugin` + 身份 + snapshot 形态（与官方上下文包
+ * `dsh-time-context` / `dsh-tmux-context` 一致）。但 0.1.7-rc.1 删除了
+ * `MessageSourceMap['plugin']`，持久化层对 `kind === 'plugin'` 直接抛
+ * `format v4 message requires a producer-owned source kind`——运行期写入不再有
+ * 迁移改写兜底。`MessageSourceMap` 现在是**开放表**，每个生产者在自己模块里合并
+ * 自己的 kind（见文件尾 `declare module '@deepseek-ai/dsh-llm'`）；读取侧仍兼容
+ * 旧 `plugin` / `mcp-catalog` 形态与 v3→v4 迁移改写形态 `plugin:…`。
  */
 export const CATALOG_SOURCE_PLUGIN = "@dunlingzi/dsh-mcp-servers";
+/** 目录快照消息的生产者 kind（自有，0.1.7-rc.1 起写入侧使用）。 */
+export const CATALOG_SOURCE_KIND = "dsh-mcp-servers";
+/** 升级前 `{ kind: "plugin", plugin: … }` 经宿主 v3→v4 迁移改写的形态（读取侧兼容）。 */
+export const CATALOG_MIGRATED_KIND = `plugin:${CATALOG_SOURCE_PLUGIN}`;
 /** 目录快照的段名（snapshot 形态下承载渲染后的目录正文）。 */
 export const CATALOG_SECTION_NAME = "mcp-catalog";
 
@@ -213,8 +221,7 @@ export function renderMcpCatalogMessage(entries: CatalogEntry[], mode?: string):
     role: "user",
     content: [{ type: "text", text: lines }],
     source: {
-      kind: "plugin",
-      plugin: CATALOG_SOURCE_PLUGIN,
+      kind: CATALOG_SOURCE_KIND,
       form: "snapshot",
       sections: [{ name: CATALOG_SECTION_NAME, text: lines }],
     },
@@ -231,10 +238,12 @@ export function escapeCatalogText(value: unknown): string {
     .replace(/[\r\n]/gu, " ");
 }
 
-/** 是否为本插件注入的能力目录消息（新旧两代 source 形态都认，#723 跨版本兼容）。 */
+/** 是否为本插件注入的能力目录消息（历代 source 形态都认，#723 跨版本兼容 + 0.1.7-rc.1 自有 kind）。 */
 export function isCatalogSource(source: { kind?: unknown; plugin?: unknown } | undefined): boolean {
   if (source === undefined) return false;
   if (source.kind === "mcp-catalog") return true;
+  if (source.kind === CATALOG_SOURCE_KIND) return true;
+  if (source.kind === CATALOG_MIGRATED_KIND) return true;
   return source.kind === "plugin" && source.plugin === CATALOG_SOURCE_PLUGIN;
 }
 
@@ -246,23 +255,29 @@ export function findCatalogMessage(messages: CatalogMessage[]): CatalogMessage |
   return undefined;
 }
 
+/** 快照形态（`plugin` / 自有 `dsh-mcp-servers` / v3→v4 迁移 `plugin:…`）：条目藏在 sections 正文里。 */
+function isSnapshotSource(source: CatalogSourceLike | undefined): boolean {
+  return source?.kind === "plugin" || source?.kind === CATALOG_SOURCE_KIND || source?.kind === CATALOG_MIGRATED_KIND;
+}
+
 /**
  * 取回一条目录消息所发布的条目。
  *
- * 新旧两代形态（#723）：
+ * 历代形态（#723 + 0.1.7-rc.1）：
  * - 旧形态 `{ kind: "mcp-catalog", form: "catalog", entries }`：逐条还原条目，
  *   digest 与升级前完全一致；
- * - 新形态 `{ kind: "plugin", form: "snapshot", sections: [{ name, text }] }`：
- *   从快照正文的 `<available_mcp_servers>` 块还原条目（格式化是单射的），使
- *   digest 与 `composeCatalogEntries` 的条目 digest 同口径——否则每次启动都会
- *   误判"目录已变"而注入一条修正帧。
+ * - 快照形态 `{ kind, form: "snapshot", sections: [{ name, text }] }`（写入侧自
+ *   0.1.7-rc.1 起用自有 `dsh-mcp-servers`，此前用 `plugin`，迁移后为
+ *   `plugin:…`）：从快照正文的 `<available_mcp_servers>` 块还原条目（格式化是
+ *   单射的），使 digest 与 `composeCatalogEntries` 的条目 digest 同口径——否则
+ *   每次启动都会误判"目录已变"而注入一条修正帧。
  *
  * 坏数据返回 undefined（按"不是本插件的目录"处理）：本函数在 step 监听器里被调用，
  * 抛错会让该会话每一轮都失败。
  */
 export function resolveCatalogEntries(source: CatalogSourceLike | undefined): CatalogEntry[] | undefined {
-  if (!isCatalogSource(source)) return undefined;
-  if (source?.kind === "plugin") {
+  if (!isCatalogSource(source) || source === undefined) return undefined;
+  if (isSnapshotSource(source)) {
     const sections = source.sections;
     if (!Array.isArray(sections)) return undefined;
     const section = sections.find(
@@ -275,7 +290,7 @@ export function resolveCatalogEntries(source: CatalogSourceLike | undefined): Ca
     if (section === undefined) return undefined;
     return parseCatalogBody(section.text);
   }
-  const entries = source?.entries;
+  const entries = source.entries;
   if (!Array.isArray(entries)) return undefined;
   const readable: CatalogEntry[] = [];
   for (const entry of entries) {
@@ -350,4 +365,21 @@ export function renderMcpCatalogUpdate(entries: CatalogEntry[], mode?: string): 
     "</system-reminder>",
   ].join("\n");
   return { ...body, content: [{ type: "text", text }] };
+}
+
+/**
+ * 声明本插件的生产者 source kind（0.1.7-rc.1 兼容）：
+ * 宿主删除 `MessageSourceMap['plugin']` 后，持久化层拒绝 `kind === 'plugin'` 的
+ * 运行期写入。`MessageSourceMap` 是开放表（merge-extensible），每个生产者在自己的
+ * 模块里合并自有 kind；仅类型声明（编译期擦除，不引入任何运行时导入）。
+ */
+declare module "@deepseek-ai/dsh-llm" {
+  interface MessageSourceMap {
+    /** 能力目录快照消息的生产者 kind（写入侧见 {@link renderMcpCatalogMessage}）。 */
+    "dsh-mcp-servers": {
+      kind: "dsh-mcp-servers";
+      form: "snapshot";
+      sections: readonly { name: string; text: string }[];
+    };
+  }
 }

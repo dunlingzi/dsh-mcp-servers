@@ -137,6 +137,8 @@ export {
   isCatalogSource,
   resolveCatalogEntries,
   CATALOG_SOURCE_PLUGIN,
+  CATALOG_SOURCE_KIND,
+  CATALOG_MIGRATED_KIND,
   CATALOG_SECTION_NAME,
   catalogHistory,
   renderMcpCatalogUpdate,
