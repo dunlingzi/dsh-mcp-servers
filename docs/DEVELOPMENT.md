@@ -203,8 +203,18 @@ contract-check 禁止运行时值导入）。原自建类型层 `types/dsh.d.ts`
 - 登记项在本仓库不存在（peer 已删或已改回 `catalog:`）→ 判红（死声明）；
 - 豁免**只对 peerDependencies 生效**，devDependencies / dependencies 写区间仍判红。
 
-现行窗口是**逐代枚举**（`0.1.5-rc.2 || ^0.1.6-alpha.1 || 0.2.0-rc.2`）：宿主发布新一代
-rc 时它会直接失配，届时须先扩窗再升级宿主；长期形态建议改为向上累积（`>=0.1.5-rc.2`）。
+现行窗口是**向上累积**形态（`>=0.1.5-rc.2`，floor = 已实机验证的最低宿主），**逐代枚举
+已被淘汰**：实测 `0.1.5-rc.2 || ^0.1.6-alpha.1 || 0.2.0-rc.2` 对已发布的 `0.1.5-rc.3` /
+`0.2.0-rc.1` / `0.2.1-alpha.1` / `0.2.1-rc.1` 一律判 REFUSED，宿主一升级该 bundle 就被
+静默跳过、并从 profile 的 `dsh.profile.bundles` 写掉（见全局 `~/.dsh/AGENTS.md` 的
+「升级后必查三件」）。累积形态对已发布宿主全部放行；代价是区间内**未实测宿主**不保证
+运行时 API 兼容——宿主发布新里程碑或有破坏性 API 变更时重评 floor，并同步本段、
+`PEER_RANGE_ALLOWLIST` 的 reason 与包 README 的「版本适配」表述。
+
+判定口径用宿主自己的实现，不靠推演：`@deepseek-ai/dsh-app-boot` 导出的
+`evaluatePluginCompatibility(pluginPkg, exemptions, runtimeVersion)` 与
+`getDshRuntimeVersion()` 就是加载 bundle 时那道门的本体；改 peer 后须按**已发布宿主版本
+逐版本**复验（实机探针见 `~/_archive/.dsh/**/probe-own-rule.cjs`），确认无 REFUSED。
 
 <a id="1-宿主端srcindexts规范"></a><a id="user-content-1-宿主端srcindexts规范"></a>
 ## 1. 宿主端（`src/index.ts`）规范
