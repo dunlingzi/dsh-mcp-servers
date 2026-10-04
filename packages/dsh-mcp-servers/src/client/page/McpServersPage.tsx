@@ -222,11 +222,19 @@ export function McpServersPage(props: { ctx: any; shared: SharedSessionState }):
   };
 
   if (view !== null) {
+    // 编辑页取 summary 里的实时行：SSE 推送或手动刷新后，status/tools/disabledTools
+    // 跟着新快照走，不停留在点开那一刻（找不到时回落点击时的快照）。
+    const rows: ServerRow[] = summary?.servers ?? [];
+    const liveServer = view.mode === "edit"
+      ? rows.find((s) => s.scope === view.server.scope && s.name === view.server.name) ?? view.server
+      : null;
     return (
       <EditView
-        server={view.mode === "edit" ? view.server : null}
+        server={liveServer}
         shared={shared}
+        projectRoot={summary?.projectRoot}
         onClose={() => setView(null)}
+        onRefresh={() => void refresh()}
         onSaved={() => {
           setView(null);
           void refresh();

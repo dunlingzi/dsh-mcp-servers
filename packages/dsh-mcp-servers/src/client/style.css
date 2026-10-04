@@ -1,15 +1,33 @@
 /* dsh-mcp-servers — 设置页「MCP 服务器」样式。
  *
  * 由 build-client 的 .css text-loader 构建期内联进 client.js（产物自包含单文件）。
- * 颜色优先取 DSH 主题变量（--dsw-alias-*），缺失时回退内置色值，浅色/深色主题
- * 均可读。类名统一 ms- 前缀（mcp-servers），不留浮窗时代的全局选择器。
+ * 类名统一 ms- 前缀（mcp-servers）。
+ *
+ * 配色纪律：**只使用 DSH 主题真实存在的 token**（取自 @deepseek-ai/dsh-client-ui-theme
+ * 注入的 token 表，明暗各 165 条），并沿用官方 pairing：
+ *   - 输入/选择框：`border-l4` 边框 + `bg-layer-1` 底（对照官方 `._wrap_1g6ru_1`）
+ *   - 卡片/容器：`border-l2` 边框；列表内分隔线用更弱的 `border-l1`
+ *   - 悬停底：`interactive-bg-hover`；选中/强调底：`interactive-bg-hover-accent`
+ *   - 主按钮：`button-primary-fill` 底 + `label-primary-foreground` 字（明暗互为反色，
+ *     写死 `#fff` 会在深色主题变成白底白字）
+ *   - 状态色只用 `state-*-primary`（色点/语义）与 `state-*-tertiary`（淡底）；
+ *     文字用 `label-primary` / `label-secondary` 保证对比度（`state-success-primary`
+ *     是 #22c55e，直接当正文色只有 ~2:1，不达 WCAG）
+ *   - 焦点环：`state-business-primary`（官方 focus 用色）；链接：`link`
+ * 变量仍带浅色回退，防止主题缺项时整块不可读。
+ *
+ * 分层约定：
+ *   1 骨架 / 2 横幅 / 3 筛选条 / 4 工具行 / 5 按钮 / 6 分组与卡片 / 7 徽章与探活
+ *   / 8 开关 / 9 编辑页 / 10 导入面板 / 11 工具面板 / 12 可访问性 / 13 响应式
  */
 
+/* ---- 1 骨架 ---- */
+
 .ms-page {
-  max-width: 860px;
+  max-width: 920px;
   margin: 0 auto;
   padding: 8px 0 48px;
-  color: var(--dsw-alias-label-primary, #1f2329);
+  color: var(--dsw-alias-label-primary, #0f1115);
   font-size: 14px;
   line-height: 1.5;
 }
@@ -21,34 +39,90 @@
 }
 
 .ms-subtitle {
-  margin: 0 0 16px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
+  margin: 0 0 14px;
+  color: var(--dsw-alias-label-secondary, #61666b);
 }
 
 .ms-hint {
-  color: var(--dsw-alias-label-tertiary, #9aa1ad);
+  color: var(--dsw-alias-label-tertiary, #81858c);
   font-size: 12px;
-  margin: 4px 0 8px;
+  margin: 6px 0 8px;
 }
 
-.ms-error-banner {
-  background: var(--dsw-alias-state-error-secondary, rgba(224, 72, 62, 0.1));
-  color: var(--dsw-alias-state-error-primary, #e0483e);
+/* ---- 2 横幅 ---- */
+
+.ms-error-banner,
+.ms-ok-banner {
   border-radius: 8px;
   padding: 8px 12px;
   margin: 0 0 12px;
   font-size: 13px;
+  word-break: break-word;
 }
 
-/* ---- 工具行 ---- */
+.ms-error-banner {
+  background: var(--dsw-alias-interactive-bg-hover-danger, rgba(236, 19, 19, 0.08));
+  color: var(--dsw-alias-state-error-primary, #ec1313);
+}
+
+.ms-ok-banner {
+  background: var(--dsw-alias-state-success-tertiary, #e6faed);
+  color: var(--dsw-alias-label-primary, #0f1115);
+}
+
+/* ---- 3 筛选条（状态簇：既是图例也是筛选器） ---- */
+
+.ms-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 0 10px;
+}
+
+.ms-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #61666b);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ms-chip:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
+}
+
+.ms-chip-active {
+  border-color: var(--dsw-alias-border-l4, rgba(0, 0, 0, 0.16));
+  background: var(--dsw-alias-interactive-bg-hover-accent, rgba(38, 49, 72, 0.14));
+  color: var(--dsw-alias-label-primary, #0f1115);
+  font-weight: 600;
+}
+
+.ms-chip-count {
+  color: var(--dsw-alias-label-tertiary, #81858c);
+  font-variant-numeric: tabular-nums;
+}
+
+.ms-chip-active .ms-chip-count {
+  color: inherit;
+}
+
+/* ---- 4 工具行 ---- */
 
 .ms-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
-  margin: 8px 0 4px;
+  margin: 10px 0 2px;
 }
 
 .ms-toolbar-left,
@@ -59,38 +133,81 @@
   flex-wrap: wrap;
 }
 
-.ms-count {
-  color: var(--dsw-alias-label-secondary, #6b7280);
+.ms-seg {
+  display: inline-flex;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ms-seg-btn {
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary, #61666b);
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  min-height: 32px;
+}
+
+.ms-seg-btn + .ms-seg-btn {
+  border-left: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+}
+
+.ms-seg-btn:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
+}
+
+.ms-seg-active {
+  background: var(--dsw-alias-button-primary-fill, #0f1115);
+  color: var(--dsw-alias-label-primary-foreground, #fff);
+  font-weight: 600;
+}
+
+.ms-seg-active:hover {
+  background: var(--dsw-alias-button-primary-fill, #0f1115);
+}
+
+.ms-mode-label {
+  color: var(--dsw-alias-label-secondary, #61666b);
   font-size: 13px;
 }
 
 .ms-search {
-  min-width: 220px;
+  min-width: 200px;
+  min-height: 32px;
   padding: 6px 10px;
-  border: 1px solid var(--dsw-alias-line-secondary, #d0d5dd);
+  border: 1px solid var(--dsw-alias-border-l4, rgba(0, 0, 0, 0.16));
   border-radius: 8px;
-  background: var(--dsw-alias-bg-primary, transparent);
+  background: var(--dsw-alias-bg-layer-1, transparent);
   color: inherit;
   outline: none;
 }
 
-.ms-search:focus {
-  border-color: var(--dsw-alias-brand-primary, #4e6ef2);
-}
-
 .ms-select {
+  min-height: 32px;
   padding: 6px 8px;
-  border: 1px solid var(--dsw-alias-line-secondary, #d0d5dd);
+  border: 1px solid var(--dsw-alias-border-l4, rgba(0, 0, 0, 0.16));
   border-radius: 8px;
-  background: var(--dsw-alias-bg-primary, transparent);
+  background: var(--dsw-alias-bg-layer-1, transparent);
   color: inherit;
 }
 
-/* ---- 按钮 ---- */
+.ms-search:focus,
+.ms-select:focus {
+  border-color: var(--dsw-alias-state-business-primary, #4176e6);
+}
+
+/* ---- 5 按钮 ---- */
 
 .ms-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border: 1px solid transparent;
   border-radius: 8px;
+  min-height: 32px;
   padding: 6px 12px;
   font-size: 13px;
   cursor: pointer;
@@ -103,43 +220,56 @@
   cursor: not-allowed;
 }
 
+.ms-btn-icon {
+  padding: 6px 9px;
+}
+
 .ms-btn-primary {
-  background: var(--dsw-alias-brand-primary, #4e6ef2);
-  color: #fff;
+  background: var(--dsw-alias-button-primary-fill, #0f1115);
+  color: var(--dsw-alias-label-primary-foreground, #fff);
 }
 
 .ms-btn-primary:hover:not(:disabled) {
-  filter: brightness(1.08);
+  background: var(--dsw-alias-button-primary-hover, #43454a);
 }
 
 .ms-btn-ghost {
-  border-color: var(--dsw-alias-line-secondary, #d0d5dd);
+  border-color: var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
 }
 
 .ms-btn-ghost:hover:not(:disabled) {
-  background: var(--dsw-alias-bg-hover, rgba(127, 127, 127, 0.08));
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
 }
 
 .ms-btn-danger {
-  color: var(--dsw-alias-state-error-primary, #e0483e);
-  border-color: var(--dsw-alias-state-error-primary, #e0483e);
+  color: var(--dsw-alias-state-error-primary, #ec1313);
+  border-color: var(--dsw-alias-state-error-primary, #ec1313);
 }
 
 .ms-btn-danger:hover:not(:disabled) {
-  background: var(--dsw-alias-state-error-secondary, rgba(224, 72, 62, 0.08));
+  background: var(--dsw-alias-interactive-bg-hover-danger, rgba(236, 19, 19, 0.06));
 }
 
-/* ---- 分组与卡片 ---- */
+.ms-btn-danger-solid {
+  background: var(--dsw-alias-state-error-primary, #ec1313);
+  color: var(--dsw-alias-label-primary-foreground, #fff);
+}
+
+.ms-btn-danger-solid:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+/* ---- 6 分组与卡片 ---- */
 
 .ms-group-title {
   font-weight: 600;
   margin: 16px 0 8px;
-  color: var(--dsw-alias-label-secondary, #6b7280);
+  color: var(--dsw-alias-label-secondary, #61666b);
   font-size: 13px;
 }
 
 .ms-group-count {
-  color: var(--dsw-alias-label-tertiary, #9aa1ad);
+  color: var(--dsw-alias-label-tertiary, #81858c);
   font-weight: 400;
   margin-left: 4px;
 }
@@ -151,44 +281,53 @@
 }
 
 .ms-card {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
-  border: 1px solid var(--dsw-alias-line-secondary, #e5e7eb);
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
   border-radius: 10px;
   padding: 12px 14px;
-  cursor: pointer;
 }
 
 .ms-card:hover {
-  border-color: var(--dsw-alias-brand-primary, #4e6ef2);
+  border-color: var(--dsw-alias-border-l4, rgba(0, 0, 0, 0.16));
 }
 
-.ms-card-icon {
+/* 拉伸按钮：卡片主操作（进编辑），覆盖整张卡片但位于操作区之下。
+   键盘可达 + 有可读名；卡片内不再嵌套可交互元素。 */
+.ms-card-hit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.ms-card-hit:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, #4176e6);
+  outline-offset: 2px;
+}
+
+.ms-card-glyph,
+.ms-card-body {
   position: relative;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: var(--dsw-alias-bg-hover, rgba(127, 127, 127, 0.1));
+  z-index: 0;
+}
+
+.ms-card-glyph {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
+  color: var(--dsw-alias-label-secondary, #61666b);
   flex: none;
-}
-
-.ms-icon-glyph {
-  font-size: 16px;
-  opacity: 0.75;
-}
-
-.ms-dot {
-  position: absolute;
-  right: -2px;
-  bottom: -2px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 2px solid var(--dsw-alias-bg-primary, #fff);
 }
 
 .ms-card-body {
@@ -196,25 +335,45 @@
   min-width: 0;
 }
 
+.ms-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .ms-card-name {
   font-weight: 600;
 }
 
 .ms-card-sub {
-  color: var(--dsw-alias-label-secondary, #6b7280);
+  color: var(--dsw-alias-label-secondary, #61666b);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.ms-card-error {
+  color: var(--dsw-alias-state-error-primary, #ec1313);
+  font-size: 12px;
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
 .ms-card-tools {
-  color: var(--dsw-alias-label-tertiary, #9aa1ad);
+  color: var(--dsw-alias-label-tertiary, #81858c);
   font-size: 12px;
   margin-top: 2px;
 }
 
 .ms-card-actions {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -222,76 +381,122 @@
 }
 
 .ms-empty {
-  border: 1px dashed var(--dsw-alias-line-secondary, #d0d5dd);
+  border: 1px dashed var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
   border-radius: 10px;
   padding: 32px;
   text-align: center;
-  color: var(--dsw-alias-label-tertiary, #9aa1ad);
+  color: var(--dsw-alias-label-tertiary, #81858c);
   margin-top: 16px;
 }
 
-/* ---- 探活结果 ---- */
+/* ---- 7 徽章与探活 ---- */
+
+/* 状态徽章 = 官方 pill 形态（淡底 + 中性文字） + 语义色点。
+   文字用 label-secondary 而不是 state-*-primary：后者是 #22c55e 这类中间色，
+   当正文色只有 ~2:1 对比度；语义由色点承担，文字保证可读。 */
+.ms-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 8px 1px 6px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 18px;
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
+  color: var(--dsw-alias-label-secondary, #61666b);
+  white-space: nowrap;
+}
+
+.ms-badge .ms-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.ms-badge-danger {
+  background: var(--dsw-alias-interactive-bg-hover-danger, rgba(236, 19, 19, 0.08));
+  color: var(--dsw-alias-state-error-primary, #ec1313);
+}
 
 .ms-probe-ok,
-.ms-probe-fail {
+.ms-probe-fail,
+.ms-probe-pending {
   font-size: 12px;
   margin-top: 8px;
   padding: 6px 10px;
   border-radius: 6px;
+  word-break: break-word;
 }
 
 .ms-probe-ok {
-  color: var(--dsw-alias-state-success-primary, #0f9d6e);
-  background: var(--dsw-alias-state-success-secondary, rgba(15, 157, 110, 0.1));
+  background: var(--dsw-alias-state-success-tertiary, #e6faed);
+  color: var(--dsw-alias-label-primary, #0f1115);
 }
 
 .ms-probe-fail {
-  color: var(--dsw-alias-state-error-primary, #e0483e);
-  background: var(--dsw-alias-state-error-secondary, rgba(224, 72, 62, 0.1));
+  background: var(--dsw-alias-interactive-bg-hover-danger, rgba(236, 19, 19, 0.08));
+  color: var(--dsw-alias-state-error-primary, #ec1313);
 }
 
-/* ---- 启停开关 ---- */
+.ms-probe-pending {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
+  color: var(--dsw-alias-label-secondary, #61666b);
+}
+
+/* ---- 8 开关 ---- */
 
 .ms-switch {
   position: relative;
   display: inline-block;
-  width: 36px;
-  height: 20px;
+  width: 40px;
+  height: 24px;
   flex: none;
+  cursor: pointer;
 }
 
 .ms-switch input {
   opacity: 0;
-  width: 0;
-  height: 0;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
 }
 
 .ms-switch-slider {
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  background: var(--dsw-alias-label-tertiary, #9aa1ad);
+  background: var(--dsw-alias-label-tertiary, #81858c);
   transition: background 0.15s ease;
+  pointer-events: none;
 }
 
 .ms-switch-slider::before {
   content: "";
   position: absolute;
-  width: 16px;
-  height: 16px;
-  left: 2px;
-  top: 2px;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  top: 3px;
   border-radius: 50%;
   background: #fff;
   transition: transform 0.15s ease;
 }
 
 .ms-switch input:checked + .ms-switch-slider {
-  background: var(--dsw-alias-state-success-primary, #0f9d6e);
+  background: var(--dsw-alias-state-success-primary, #22c55e);
 }
 
 .ms-switch input:checked + .ms-switch-slider::before {
   transform: translateX(16px);
+}
+
+.ms-switch input:focus-visible + .ms-switch-slider {
+  outline: 2px solid var(--dsw-alias-state-business-primary, #4176e6);
+  outline-offset: 2px;
 }
 
 .ms-switch-busy {
@@ -299,7 +504,7 @@
   pointer-events: none;
 }
 
-/* ---- 编辑视图 ---- */
+/* ---- 9 编辑页 ---- */
 
 .ms-breadcrumb {
   display: flex;
@@ -312,18 +517,23 @@
 .ms-breadcrumb-root {
   background: none;
   border: none;
-  color: var(--dsw-alias-brand-primary, #4e6ef2);
+  color: var(--dsw-alias-link, #4176e6);
   cursor: pointer;
   padding: 0;
   font-size: 13px;
 }
 
+.ms-breadcrumb-root:disabled {
+  color: var(--dsw-alias-label-tertiary, #81858c);
+  cursor: not-allowed;
+}
+
 .ms-breadcrumb-sep {
-  color: var(--dsw-alias-label-tertiary, #9aa1ad);
+  color: var(--dsw-alias-label-tertiary, #81858c);
 }
 
 .ms-breadcrumb-current {
-  color: var(--dsw-alias-label-secondary, #6b7280);
+  color: var(--dsw-alias-label-secondary, #61666b);
 }
 
 .ms-edit-head {
@@ -336,7 +546,7 @@
 
 .ms-mode-switch {
   display: inline-flex;
-  border: 1px solid var(--dsw-alias-line-secondary, #d0d5dd);
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
   border-radius: 8px;
   overflow: hidden;
 }
@@ -348,15 +558,20 @@
   padding: 6px 14px;
   cursor: pointer;
   font-size: 13px;
+  min-height: 32px;
+}
+
+.ms-mode-switch button:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(38, 49, 72, 0.06));
 }
 
 .ms-mode-switch button.ms-mode-active {
-  background: var(--dsw-alias-brand-primary, #4e6ef2);
-  color: #fff;
+  background: var(--dsw-alias-button-primary-fill, #0f1115);
+  color: var(--dsw-alias-label-primary-foreground, #fff);
 }
 
 .ms-form-card {
-  border: 1px solid var(--dsw-alias-line-secondary, #e5e7eb);
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
   border-radius: 12px;
   padding: 20px;
   margin-top: 12px;
@@ -379,10 +594,6 @@
   min-width: 220px;
 }
 
-.ms-field-narrow {
-  max-width: 280px;
-}
-
 .ms-label {
   display: block;
   font-size: 13px;
@@ -395,15 +606,16 @@
   width: 100%;
   box-sizing: border-box;
   padding: 8px 10px;
-  border: 1px solid var(--dsw-alias-line-secondary, #d0d5dd);
+  border: 1px solid var(--dsw-alias-border-l4, rgba(0, 0, 0, 0.16));
   border-radius: 8px;
-  background: var(--dsw-alias-bg-primary, transparent);
+  background: var(--dsw-alias-bg-layer-1, transparent);
   color: inherit;
   font-size: 13px;
   font-family: inherit;
 }
 
-.ms-input:disabled {
+.ms-input:disabled,
+.ms-select:disabled {
   opacity: 0.6;
 }
 
@@ -411,11 +623,11 @@
 .ms-textarea:focus,
 .ms-json:focus {
   outline: none;
-  border-color: var(--dsw-alias-brand-primary, #4e6ef2);
+  border-color: var(--dsw-alias-state-business-primary, #4176e6);
 }
 
 .ms-field-hint {
-  color: var(--dsw-alias-label-tertiary, #9aa1ad);
+  color: var(--dsw-alias-label-tertiary, #81858c);
   font-size: 12px;
   margin-top: 4px;
 }
@@ -429,9 +641,9 @@
   width: 100%;
   box-sizing: border-box;
   padding: 12px;
-  border: 1px solid var(--dsw-alias-line-secondary, #d0d5dd);
+  border: 1px solid var(--dsw-alias-border-l4, rgba(0, 0, 0, 0.16));
   border-radius: 8px;
-  background: var(--dsw-alias-bg-primary, transparent);
+  background: var(--dsw-alias-bg-layer-1, transparent);
   color: inherit;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12.5px;
@@ -444,6 +656,7 @@
   justify-content: space-between;
   gap: 12px;
   margin-top: 20px;
+  flex-wrap: wrap;
 }
 
 .ms-form-footer-right {
@@ -451,4 +664,188 @@
   align-items: center;
   gap: 8px;
   margin-left: auto;
+  flex-wrap: wrap;
+}
+
+/* 页内确认条（替代 window.confirm 阻塞对话框） */
+.ms-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--dsw-alias-state-warn-secondary, #f7ad31);
+  background: var(--dsw-alias-state-warn-tertiary, #fef5e7);
+  color: var(--dsw-alias-label-primary, #0f1115);
+  font-size: 13px;
+}
+
+.ms-confirm-text {
+  flex: 1 1 260px;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.ms-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* ---- 10 导入面板 ---- */
+
+.ms-import {
+  margin-top: 8px;
+}
+
+.ms-import-head {
+  margin-bottom: 4px;
+}
+
+.ms-import-scope {
+  margin: 12px 0 0;
+  max-width: 520px;
+}
+
+.ms-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--dsw-alias-label-secondary, #61666b);
+  cursor: pointer;
+  min-height: 32px;
+}
+
+/* ---- 11 工具面板（工具级禁用） ---- */
+
+.ms-tools {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.04));
+}
+
+.ms-tools-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ms-tools-summary {
+  color: var(--dsw-alias-label-tertiary, #81858c);
+  font-size: 12px;
+}
+
+.ms-tools-empty {
+  color: var(--dsw-alias-label-tertiary, #81858c);
+  font-size: 13px;
+  padding: 10px 0;
+}
+
+.ms-tools-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+  border-radius: 8px;
+}
+
+.ms-tool-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+}
+
+.ms-tool-row + .ms-tool-row {
+  border-top: 1px solid var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.04));
+}
+
+.ms-tool-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  word-break: break-all;
+}
+
+.ms-tool-name-off {
+  color: var(--dsw-alias-label-tertiary, #81858c);
+  text-decoration: line-through;
+}
+
+/* ---- 12 可访问性 ---- */
+
+.ms-page :focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary, #4176e6);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-switch-slider,
+  .ms-switch-slider::before {
+    transition: none;
+  }
+}
+
+/* ---- 13 响应式（pad / phone 经局域网访问是主要场景之一） ---- */
+
+@media (max-width: 720px) {
+  .ms-page {
+    padding-bottom: 32px;
+  }
+
+  .ms-toolbar,
+  .ms-toolbar-left,
+  .ms-toolbar-right {
+    width: 100%;
+  }
+
+  .ms-toolbar-left,
+  .ms-toolbar-right {
+    justify-content: flex-start;
+  }
+
+  .ms-search {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ms-btn,
+  .ms-chip,
+  .ms-seg-btn {
+    min-height: 36px;
+  }
+
+  .ms-card {
+    flex-wrap: wrap;
+  }
+
+  .ms-card-glyph {
+    width: 32px;
+    height: 32px;
+  }
+
+  .ms-card-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .ms-field-row {
+    flex-direction: column;
+  }
+
+  .ms-field-row .ms-field {
+    min-width: 0;
+  }
+
+  .ms-form-card {
+    padding: 14px;
+  }
 }

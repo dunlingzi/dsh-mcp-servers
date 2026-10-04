@@ -633,6 +633,30 @@ it("#362 无游离 css：style.css 全部内联进 client.js（无独立样式�
   expect(!clientSrc.includes('rel="stylesheet"'), "无独立样式表请求").toBeTruthy();
 });
 
+it("客户端设置页可访问性与接线契约（状态徽章 / role=switch / 无阻塞对话框 / 补口路由）", () => {
+  const clientSrc = readFileSync(new URL("../../lib/client.js", import.meta.url), "utf8");
+  // 状态不靠颜色单独承载：色点 + 文字徽章双通道，语义档由 STATUS_ORDER 单点派生。
+  expect(clientSrc.includes("ms-badge"), "状态徽章类进产物").toBeTruthy();
+  expect(clientSrc.includes("statusTone"), "状态语义档映射进产物").toBeTruthy();
+  expect(clientSrc.includes("statusTextKey"), "状态文案 key 取值进产物").toBeTruthy();
+  // 卡片主操作走原生 button（可聚焦 + 可读名），取代 div onClick 的鼠标独占交互。
+  expect(clientSrc.includes("ms-card-hit"), "卡片拉伸按钮进产物").toBeTruthy();
+  expect(clientSrc.includes("editAria"), "卡片主操作可读名进产物").toBeTruthy();
+  // 声明式开关语义：role=switch + aria-checked（可读名）。
+  expect(clientSrc.includes("aria-checked"), "开关 aria-checked 进产物").toBeTruthy();
+  expect(clientSrc.includes("toggleAria"), "开关可读名进产物").toBeTruthy();
+  // 阻塞式对话框退役：错误走页内 role=alert，危险操作走页内确认条。
+  expect(/window\.confirm\s*\(/.test(clientSrc), "不得残留 window.confirm 阻塞确认").toBeFalsy();
+  expect(/(^|[^\w.$"'])alert\s*\(/m.test(clientSrc), "不得残留 alert() 阻塞提示").toBeFalsy();
+  expect(clientSrc.includes("ms-confirm"), "页内确认条进产物").toBeTruthy();
+  // 两条既有宿主路由此前无 UI 入口，本版补齐：工具级禁用面板 + mcpServers JSON 导入。
+  expect(clientSrc.includes("/api/dsh-mcp-servers/tool-disable"), "工具级禁用面板接线").toBeTruthy();
+  expect(clientSrc.includes("/api/dsh-mcp-servers/import/json"), "JSON 导入面板接线").toBeTruthy();
+  // 双模式互为镜像：切 JSON 序列化表单、切回表单解析回填（不再各持半套状态）。
+  expect(clientSrc.includes("applyJsonToForm"), "JSON → 表单回填进产物").toBeTruthy();
+  expect(clientSrc.includes("jsonSyncHint"), "同步语义说明进产物").toBeTruthy();
+});
+
 it("客户端 watchdog：60s 失活重建 + 建连前先关旧（0.1.8 同款防泄漏）", () => {
   const clientSrc = readFileSync(new URL("../../lib/client.js", import.meta.url), "utf8");
   expect(clientSrc, "60s watchdog 常量存在").toMatch(/WATCHDOG_MS\s*=\s*(?:60_?000|6e4|60000)/);

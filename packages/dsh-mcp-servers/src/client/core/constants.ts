@@ -4,6 +4,9 @@
  * 状态排序、状态点颜色、API 路径等纯常量，不依赖任何状态。
  * i18n（issue #348）：状态文案存字典 key（title/STATUS_TEXT），渲染期经 t 求值
  * （模块加载时 t 尚未装配，不能固化文案字符串）。
+ *
+ * tone 与 dot 同源：tone 驱动状态徽章的 CSS 类，dot 驱动色点内联样式——两处都从
+ * STATUS_ORDER 取，改一处即徽章与色点同步（不出现「点红字绿」）。
  */
 
 import type { McpLocaleKey } from "../locales.ts";
@@ -50,14 +53,17 @@ function injectedRoutes(): ApiRoutes {
 /** 与宿主端 ROUTES 同源（构建期注入）的 API 路径。 */
 export const API = injectedRoutes();
 
+/** 状态徽章语义档（映射 style.css 的 .ms-badge-<tone>）。 */
+export type StatusTone = "success" | "info" | "warn" | "neutral" | "danger";
+
 /** 状态分组排序（按优先级降序；titleKey 为字典 key，渲染期 t(titleKey)）。 */
-export const STATUS_ORDER = [
-  { key: "connected", titleKey: "stConnected" as McpLocaleKey, dot: "var(--dsw-alias-state-success-primary,#0f9d6e)" },
-  { key: "connecting", titleKey: "stConnecting" as McpLocaleKey, dot: "var(--dsw-alias-state-business-primary,#2f7bf6)" },
-  { key: "reconnecting", titleKey: "stReconnecting" as McpLocaleKey, dot: "var(--dsw-alias-state-warn-primary,#e08b1e)" },
-  { key: "stopped", titleKey: "stStopped" as McpLocaleKey, dot: "var(--dsw-alias-label-tertiary,#9aa1ad)" },
-  { key: "disabled", titleKey: "stDisabled" as McpLocaleKey, dot: "var(--dsw-alias-label-tertiary,#9aa1ad)" },
-  { key: "failed", titleKey: "stFailed" as McpLocaleKey, dot: "var(--dsw-alias-state-error-primary,#e0483e)" },
+export const STATUS_ORDER: Array<{ key: string; titleKey: McpLocaleKey; dot: string; tone: StatusTone }> = [
+  { key: "connected", titleKey: "stConnected", dot: "var(--dsw-alias-state-success-primary,#0f9d6e)", tone: "success" },
+  { key: "connecting", titleKey: "stConnecting", dot: "var(--dsw-alias-state-business-primary,#2f7bf6)", tone: "info" },
+  { key: "reconnecting", titleKey: "stReconnecting", dot: "var(--dsw-alias-state-warn-primary,#e08b1e)", tone: "warn" },
+  { key: "stopped", titleKey: "stStopped", dot: "var(--dsw-alias-label-tertiary,#9aa1ad)", tone: "neutral" },
+  { key: "disabled", titleKey: "stDisabled", dot: "var(--dsw-alias-label-tertiary,#9aa1ad)", tone: "neutral" },
+  { key: "failed", titleKey: "stFailed", dot: "var(--dsw-alias-state-error-primary,#e0483e)", tone: "danger" },
 ];
 
 /** 状态 → 字典 key 映射（渲染期 t(STATUS_TEXT[status])；未知状态回落原始 key 显示）。 */
@@ -75,3 +81,26 @@ export function statusDot(status: string): string {
   const group = STATUS_ORDER.find((entry) => entry.key === status);
   return group !== undefined ? group.dot : "var(--dsw-alias-label-tertiary,#9aa1ad)";
 }
+
+/** 状态语义档（徽章样式用；未知状态回落 neutral）。 */
+export function statusTone(status: string): StatusTone {
+  const group = STATUS_ORDER.find((entry) => entry.key === status);
+  return group !== undefined ? group.tone : "neutral";
+}
+
+/** 状态字典 key（未知状态返回 undefined，由调用方决定回落文案）。 */
+export function statusTextKey(status: string): McpLocaleKey | undefined {
+  return STATUS_TEXT[status];
+}
+
+/**
+ * 状态簇（筛选条用）：把六态收成四簇，簇内语义一致、文案复用状态字典。
+ * connected=运行中；pending=连接中/重连中；idle=未连接/已停用；failed=失败。
+ * 「全部」不入表——它是「不筛」而非一个簇。
+ */
+export const STATUS_BUCKETS: Array<{ id: string; labelKey: McpLocaleKey; match(status: string): boolean }> = [
+  { id: "connected", labelKey: "stConnected", match: (s) => s === "connected" },
+  { id: "pending", labelKey: "bucketPending", match: (s) => s === "connecting" || s === "reconnecting" },
+  { id: "idle", labelKey: "bucketIdle", match: (s) => s === "stopped" || s === "disabled" },
+  { id: "failed", labelKey: "stFailed", match: (s) => s === "failed" },
+];

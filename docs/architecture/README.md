@@ -68,6 +68,20 @@ flowchart LR
 | **发布物自包含** | 第三方依赖构建期内联进 `lib/`，运行时零 npm 依赖；license 自动归集 `lib/THIRD-PARTY-LICENSES` | `scripts/build/` |
 | **宿主 / 客户端契约** | 宿主端在组合根透出纯函数与常量，smoke 从产物导入断言（路由围栏 + 客户端契约） | `packages/dsh-mcp-servers/test/` |
 
+## 设计文档
+
+客户端 UI 的设计基线单独成册，事实源为 `feat/settings-page-ux-a11y @ 6a66f75`
+（`style.css` 851 行），与 checkout 所在分支解耦：
+
+| 文档 | 管什么 |
+|---|---|
+| [设计文档索引](../design/README.md) | 事实源快照、两份文档分工、维护约定 |
+| [UI/UX 设计文档](../design/ui-design.md) | 信息架构、页面与组件结构、交互流程、状态呈现、可访问性与键盘、i18n 文案面 |
+| [前端样式规范](../design/style-spec.md) | token 层与配对纪律、命名与分层、刻度、组件样式规格、主题、响应式、动效、禁止清单 |
+
+> 本目录其余文档讲「插件如何工作」，以上三份讲「界面长什么样、为什么」；
+> 改动客户端 UI 时两类文档需同步更新。
+
 > settings 的**落盘位置**当前两说并存（`shared/README.md` 写 `<DSH_HOME>/settings.yaml`，
 > 全局 `~/.dsh/AGENTS.md` 说该文件自 rc.2 起被启动消费改名）——动手前先实测，
 > 裁决记录见 [structure-review §10](dsh-mcp-servers-structure-review.md#10-未核实)。

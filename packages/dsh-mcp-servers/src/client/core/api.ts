@@ -21,9 +21,22 @@ export function toolDisableServerKey(server: any, projectRoot: string | undefine
  * 会话 cwd 查询参数（C7/#412 自愈）：connect/reconnect/probe 等操作携带
  * 当前会话 cwd，宿主 maybeSession 据此恢复会话（middleware project 级连接
  * 需要；宿主 setSession 幂等短路，正常时零副作用）。空 cwd 返回空串。
+ *
+ * ⚠️ 返回值以 `&` 开头，只能接在**已有 `?`** 的路径后。目标路径尚无 query 时
+ * 一律用 `withCwd()`——手拼会把 `&cwd=` 拼进 pathname，宿主 exact 路由不命中，
+ * 请求落到前端静态 fallback 并返回 405。
  */
 export function cwdQueryOf(cwd: string | undefined): string {
   return typeof cwd === "string" && cwd !== "" ? `&cwd=${encodeURIComponent(cwd)}` : "";
+}
+
+/**
+ * 给路径追加会话 cwd 查询参数，自动选择 `?` / `&` 分隔符。
+ * 无 query 的路径（如 tool-disable）必须走本函数，不要手拼 `cwdQueryOf`。
+ */
+export function withCwd(path: string, cwd: string | undefined): string {
+  if (typeof cwd !== "string" || cwd === "") return path;
+  return `${path}${path.includes("?") ? "&" : "?"}cwd=${encodeURIComponent(cwd)}`;
 }
 
 /**

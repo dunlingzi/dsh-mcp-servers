@@ -58,20 +58,41 @@ npx @deepseek-ai/dsh plugin --profile web add @dunlingzi/dsh-mcp-servers
 
 ## Usage (Settings → MCP Servers)
 
-- **List view**: scope filter (All / User / Project) + search + refresh + New;
-  cards grouped by "User (global) / Project", showing status dot, transport and
-  endpoint summary, tool count and an enable toggle; click a card to edit
+- **List view**: status-cluster filter chips (All / Running / Connecting / Idle /
+  Failed — they double as the status legend and carry live counts), scope
+  segmented control (All / User / Project), search, refresh, Import JSON, New;
+  cards grouped by "User (global) / Project", showing a status dot **plus** a text
+  badge (colour is never the only channel), transport and endpoint summary, tool
+  count and an enable toggle; the whole card is a keyboard-reachable button, and
+  a failed server renders its error on its own line
 - **Edit view**: breadcrumb navigation, Form / JSON dual mode; fields: name
-  (read-only when editing), scope, transport, timeout MS, command / args / env /
-  cwd (stdio) or URL / headers (http); Delete (with confirm) bottom-left,
-  Test / Cancel / Save bottom-right
+  (read-only when editing), scope, transport, timeout, command / args / env /
+  cwd (stdio) or URL / headers (http); Delete and Cancel use an **inline confirm
+  bar** (no blocking `window.confirm`), Test / Cancel / Save bottom-right
+- **Form / JSON mirroring**: switching to JSON serializes the current form, and
+  switching back parses the JSON into the form — neither side silently discards
+  the other's edits (quoted args survive the round trip)
+- **Tool-level disable**: connected servers list their tools in the edit view
+  (`tools/list`) with a per-tool switch; a disabled tool is invisible to the
+  model through every entry point. Records for global servers are shared across
+  workspaces
+- **Lossless args round-trip**: the args text field and the structured array are
+  strictly inverse (spaces, double quotes, backslashes and empty-string args all
+  survive item-by-item) — opening the editor and saving never rewrites your config
+- **Import**: the toolbar's Import panel accepts mcpServers JSON — both the
+  Claude Desktop / Cursor wrapper `{"mcpServers": {...}}` (unwrapped client-side)
+  and a bare `{"name": {...}}` map; existing names are skipped unless "overwrite"
+  is checked; the **scope is selectable** (defaults to the current session:
+  project-level when a project root exists) and the landing file is shown right
+  below (`<DSH_HOME>/dsh-mcp.json` or `<project root>/.dsh/mcp.json`)
 - **Toggle**: ON = save config and connect (hot-applied); OFF = disconnect and
   disable, config kept
 - **Test**: one-shot MCP connection (initialize + tools/list) reporting latency
   and tool count; never mutates live connections
-- **Middleware mode**: `off / project / all` dropdown in the page header —
-  saving hot-applies and persists without restarting dsh web; config changes
-  hot-load and the page refreshes via SSE push
+- **Middleware mode**: `off / project / all` dropdown, with the effective
+  behaviour explained on its own line — saving hot-applies and persists
+  without restarting dsh web; config changes hot-load and the page refreshes via
+  SSE push
 
 ## Configuration (middleware)
 

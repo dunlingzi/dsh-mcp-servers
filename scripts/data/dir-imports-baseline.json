@@ -5,7 +5,7 @@
     "dsh-mcp-servers": {
       "modules": 14,
       "scannedSrcFiles": 70,
-      "allSrcTsFiles": 81,
+      "allSrcTsFiles": 82,
       "interfaceFacades": 14,
       "leafValueEdges": 33,
       "leafModuleCycles": 3,
