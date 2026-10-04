@@ -1,101 +1,80 @@
-# dsh-plugin-hub 插件架构文档
+# dsh-mcp-servers 插件架构文档
 
-> 本目录用**图解为主**的方式，讲清每个插件的**功能、原理、使用方式**。
-> 每份文档包含：功能概览 → 总体架构图 → 核心机制 / 时序 → 使用方式 → 安全模型与边界，
-> 与各插件包 README（安装 / 配置 / 验证的快速上手）互补。
->
+> 本目录用**图解为主**的方式，讲清本插件的**结构、原理、边界与演进**。
 > 图使用两种载体（源数据均归档、可复现）：
-> - **SVG 架构图**：按 diagram-design 编辑风手写 SVG，源文件
->   归档在 [diagrams/](diagrams/)，可直接用浏览器打开源 HTML 调整后重新导出
->   （`python3 scripts/lib/export-diagram-svg.py <源.html>`）；
+> - **SVG 架构图**：按 diagram-design 编辑风手写 SVG，源文件归档在 `diagrams/`；
 > - **Mermaid 图**：内嵌在 md 中，GitHub 原生渲染，源码即文档（天然可维护）。
 >
 > 仓库级共享机制（loopback 围栏、官方 settings 存储、client 干净模块等）见
 > [「通用机制」](#通用机制)。
 
-## 插件索引
+## 文档索引
 
-| 插件 | 一句话定位 | 架构文档 |
+| 文档 | 回答什么问题 | 什么时候读 |
 |---|---|---|
-| `@wingsky-1/dsh-lan-proxy` | 局域网访问 dsh web：HTTP/HTTPS/WS 转发 + TLS + 响应压缩 | [dsh-lan-proxy.md](dsh-lan-proxy.md) |
-| `@dunlingzi/dsh-mcp-servers` | MCP 服务器管理：stdio/HTTP 传输、工具注册、三档中间层收敛 | [dsh-mcp-servers.md](dsh-mcp-servers.md) |
-| `@wingsky-1/dsh-notifier` | 审批/完成/错误事件通知：浏览器 Notification + 系统 toast + Bark | [dsh-notifier.md](dsh-notifier.md) |
-| `@wingsky-1/dsh-provider-usage` | 多 provider 用量统计：v2 适配器契约 + 宿主端渲染 + 历史落盘 | [dsh-provider-usage.md](dsh-provider-usage.md) |
-| `@wingsky-1/dsh-web-file-preview` | 把对话内「用默认应用打开」改写成官方右侧栏预览 | [dsh-web-file-preview.md](dsh-web-file-preview.md) |
-| `@wingsky-1/dsh-verify-isolated` | 插件开发隔离浏览器验证 skill（临时 DSH_HOME + 独立 profile） | [dsh-verify-isolated.md](dsh-verify-isolated.md) |
-| `@wingsky-1/dsh-plugins-all` | 全家桶聚合包（一键装齐 + 聚合 cordis patch） | [dsh-plugins-all.md](dsh-plugins-all.md) |
+| [dsh-mcp-servers.md](dsh-mcp-servers.md) | **怎么跑**：双轨模型面、插件装配、服务器生命周期、中间层链路、传输与安全模型、路由与已知限制 | 想搞懂运行机制 / 排查行为时先读这份 |
+| [dsh-mcp-servers-structure-review.md](dsh-mcp-servers-structure-review.md) | **长什么样、哪里薄、往哪走**：仓库 / 包 / 域三级结构实测、六载体落地、对照方法论的评估、结构级风险、分阶段演进路线 | 动结构、做重构、评估技术债时先读这份 |
+
+两篇之外的依据：仓库硬性规则见 [AGENTS.md](../../AGENTS.md)，开发与构建契约见
+[docs/DEVELOPMENT.md](../DEVELOPMENT.md)，架构治理方法论（评估尺子）见
+[docs/ARCHITECTURE-METHOD.md](../ARCHITECTURE-METHOD.md)。
 
 ## 全景：插件如何挂载进 dsh web
 
-所有插件都不修改 DSH 源码——统一经 **`cordis.patch.yml` + profile 机制**挂载：
+本插件不修改 DSH 源码——统一经 **`cordis.patch.yml` + profile 机制**挂载：
 
 ```mermaid
 flowchart LR
-    subgraph npm["npm 分发（@dunlingzi/dsh-*）"]
-        P1["dsh-lan-proxy"]
-        P2["dsh-mcp-servers"]
-        P3["dsh-notifier"]
-        P4["dsh-provider-usage"]
-        P5["dsh-web-file-preview"]
-        P6["dsh-verify-isolated"]
+    subgraph npm["npm 分发（@dunlingzi/dsh-mcp-servers）"]
+        P1["包内 cordis.patch.yml<br/>insert: id ui-dsh-mcp-servers"]
     end
 
     subgraph profile["dsh web profile（cordis 运行时）"]
-        CORDIS["cordis.patch.yml<br/>insert: id + name 一行"]
+        CORDIS["cordis.patch.yml<br/>bundle 名册"]
         HOST["宿主端 lib/index.js<br/>apply(ctx) 在 Node 进程运行"]
         CLIENT["客户端 lib/client.js<br/>apply(ctx) 在浏览器运行"]
-        ROUTES["/api 路由<br/>loopback 围栏"]
+        ROUTES["/api/dsh-mcp-servers/*<br/>loopback 围栏 + SSE"]
         CORDIS --> HOST
         CORDIS --> CLIENT
         HOST --> ROUTES
+        ROUTES --> CLIENT
     end
 
     P1 --> CORDIS
-    P2 --> CORDIS
-    P3 --> CORDIS
-    P4 --> CORDIS
-    P5 --> CORDIS
-    P6 --> CORDIS
 ```
 
 要点：
 
-- **安装**：`dsh plugin --profile web add <包名>` → 包内 `cordis.patch.yml` 的 insert 行
-  被写进 profile 插件名册；`dsh web` 重启时组合 bundle，宿主端与客户端各跑一半；
+- **安装**：`dsh plugin --profile web add @dunlingzi/dsh-mcp-servers` → 包内
+  `cordis.patch.yml` 的 insert 行被写进 profile 插件名册；`dsh web` 重启时组合 bundle，
+  宿主端与客户端各跑一半；
 - **宿主端**（`exports "."` → `lib/index.js`）：在 Node 进程中 `apply(ctx)`，注入
-  `webServer` / `tools` / `settings` / `connection` 等官方服务，注册路由与事件监听；
+  `webServer` / `tools` / `settings` / `agent` 等官方服务，注册路由、工具与事件监听；
 - **客户端**（`exports "./client"` → `lib/client.js`）：干净模块（`apply(ctx)` +
-  `inject`），构建期内联样式与依赖，通过 `__DSH_ROUTES__` 拿到真实路由表；
-- **依赖关系**：各插件彼此独立（`dsh-mcp-servers` 提供的 `ctx.mcpServers` 为可选消费面，
-  无插件对其强依赖）；
-- `dsh-plugins-all` 是聚合包：dependencies 拉齐全部子包 + 聚合 cordis patch
-  （`scripts/aggregate.ts` 自动生成，禁止手改）。
+  `inject`），构建期内联样式与依赖；
+- **与 `@wingsky-1/dsh-mcp-manager` 互斥安装**（共享 `<DSH_HOME>/dsh-mcp.json` 与
+  `ws_mcp_*` / `mcp__` 工具面，同装会双注册冲突）。
 
 <a id="通用机制"></a><a id="user-content-通用机制"></a>
 ## 通用机制
 
-所有插件遵循仓库级共享约定（单一事实源在 `shared/` 与 [docs/DEVELOPMENT.md](../DEVELOPMENT.md)）：
+本插件遵循仓库级共享约定（单一事实源在 `shared/` 与 [docs/DEVELOPMENT.md](../DEVELOPMENT.md)）：
 
 | 机制 | 说明 | 实现位置 |
 |---|---|---|
 | **loopback 围栏** | 所有 `/api` 路由强制回环来源（remoteAddress + Host + 非跨站 + Origin 同源），非法 403 / 方法错 405——DNS 重绑定与跨站防御 | `shared/loopback.js`（`isLoopbackRequest`） |
-| **官方 settings 存储** | 插件配置存 dsh 官方 `settings.register` 命名空间（`<DSH_HOME>/settings.yaml`），组合层 cordis config 作 base 层，热更新由 `scope.watch` 驱动 | `shared/settings-namespace.js`（`installSettingsNamespace`） |
-| **客户端干净模块** | 只 `export function apply(ctx)` + `export const inject`；样式独立 `src/client/style.css`；构建期内联（`scripts/build/build-client.ts`） | 各包 `src/client/index.ts` |
+| **官方 settings 存储** | 插件配置走 dsh 官方 `settings.register` 命名空间，组合层 cordis config 作 base 层，热更新由 `scope.watch` 驱动 | `shared/settings-namespace.js`（`installSettingsNamespace`） |
+| **客户端干净模块** | 只 `export function apply(ctx)` + `export const inject`；样式独立 `src/client/style.css`；构建期内联（`scripts/build/build-client.ts`） | `packages/dsh-mcp-servers/src/client/index.ts` |
 | **发布物自包含** | 第三方依赖构建期内联进 `lib/`，运行时零 npm 依赖；license 自动归集 `lib/THIRD-PARTY-LICENSES` | `scripts/build/` |
-| **loopback 服务端/客户端契约** | 宿主端在 index.ts 透出纯函数/常量，smoke 从 `lib/index.js` 导入断言（路由围栏 + 客户端契约） | `test/*.test.ts` |
+| **宿主 / 客户端契约** | 宿主端在组合根透出纯函数与常量，smoke 从产物导入断言（路由围栏 + 客户端契约） | `packages/dsh-mcp-servers/test/` |
 
-## 图源归档
+> settings 的**落盘位置**当前两说并存（`shared/README.md` 写 `<DSH_HOME>/settings.yaml`，
+> 全局 `~/.dsh/AGENTS.md` 说该文件自 rc.2 起被启动消费改名）——动手前先实测，
+> 裁决记录见 [structure-review §10](dsh-mcp-servers-structure-review.md#10-未核实)。
 
-`diagrams/` 目录存放每张 SVG 架构图的**源文件**（diagram-design HTML），命名与文档一一对应：
+## 图源
 
 | 文档 | 图 | 源文件 |
 |---|---|---|
-| 本页（全景） | 挂载流程图 | mermaid 内嵌（无独立源） |
-| [dsh-lan-proxy.md](dsh-lan-proxy.md) | 转发架构图 | `diagrams/lan-proxy-architecture.html` |
 | [dsh-mcp-servers.md](dsh-mcp-servers.md) | 双轨架构图 | `diagrams/mcp-servers-architecture.html` |
-| [dsh-notifier.md](dsh-notifier.md) | 通知管线图 | `diagrams/notifier-architecture.html` |
-| [dsh-provider-usage.md](dsh-provider-usage.md) | 宿主端渲染架构图 | `diagrams/provider-usage-architecture.html` |
-
-> 调整方法：用浏览器打开源 HTML → 修改 SVG 内容 → 重新导出 SVG
-> （`python3 scripts/lib/export-diagram-svg.py <源.html>`）替换文档中的引用。
-> Mermaid 图直接改 md 源码块即可（GitHub 原生渲染）。
+| 各文档内的流程 / 时序 / 状态图 | 内嵌 mermaid | 源码即文档（改 md 即可） |

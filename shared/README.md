@@ -13,15 +13,17 @@ DSH 插件家族共用的模块（构建期 esbuild 内联进各插件包，不�
 |------|----|------|------|
 | `loopback.js` | 宿主 | `isLoopbackRequest` 安全围栏（路由 loopback 校验单一事实源） | lan-proxy / mcp-servers / notifier / provider-usage |
 | `host-utils.js` | 宿主 | `writeJson` / `errorMessage` / `readBody`（限长显式化）/ `readJsonBody`（宽松版）/ `sseData`（SSE data 帧序列化 `data: <json>\n\n`；undefined / 含 `\n` payload 行为对齐三包历史、非承诺契约；`sseData` 消费方：mcp-servers / notifier / provider-usage）/ `guardLoopbackMethod`（loopback+方法白名单守卫；403 先于 405 为守卫自身执行顺序，仅适用于套守卫端点） | lan-proxy / mcp-servers / notifier / provider-usage |
-| `frontmatter.js` | 宿主 | `parseFrontmatter` / `parseFrontmatterAll` / `setFrontmatterField` / `parseYamlBool` | 历史：commands-files / skill-explorer 同源复制统一；现生产消费已退役（verify-isolated 测试仍引用） |
+| `frontmatter.js` | 宿主 | **DEPRECATED（准入规则 7 两步走的第一步）**：`parseFrontmatter` / `parseFrontmatterAll` / `setFrontmatterField` / `parseYamlBool`。生产消费已退役（commands-files / skill-explorer 不在本仓库内），仅测试仍引用；第二步（移除模块 + 清理消费方与 `shared/*.d.ts` 副本）未执行，期间保持导出面不变 | （无生产消费方） |
 | `settings-namespace.js` | 宿主 | `installSettingsNamespace`（settings 服务面注入） | lan-proxy / mcp-servers / notifier / provider-usage |
 | `dsh-home.js` | 宿主 | `dshHome`（DSH home 解析单一事实源，#517：`DSH_HOME` 非空白原样采用、未设置或空白回落 `~/.dsh`——空白视同未设置对齐官方 `dsh-home-paths#resolveDshHome`；不 resolve/不展开 `~`，默认形态路径逐字节不变。豁免口径（非 dsh 生态凭据不跟随）与落盘纪律条款见 DEVELOPMENT.md §1，由 PR #523 承载）+ `userHome`（用户 home 接缝，#722：`HOME`（Windows 为 `USERPROFILE`）非空白原样采用、否则回落 `os.homedir()`；取值次序与 libuv 一致故默认形态逐字节不变，显式读 env 是为了在 worker_threads（Stryker 的 vitest-runner 强制 `pool: 'threads'`）下仍可被测试的 `process.env` 隔离） | lan-proxy / mcp-servers / notifier / provider-usage |
 | `mcp-servers-service.d.ts` | 宿主 | MCP 管理器服务契约类型面（消费方只走公开入口） | mcp-servers |
-| `placement-math.js` | 双端 | 浮窗/胶囊定位/层级/断点纯函数（#128 → #378 抽取，含 `panelTopForAnchor` 与参数化 `panelZIndexFor(base, dflt)`） | mcp-servers / provider-usage |
+| `sse-hub.js` | 宿主 | `createSseHub`：SSE 连接表 + hub 级单心跳（默认 30s data ping）+ 上限淘汰 + 半开/僵尸主动回收（stalled 背压 90s 判死 / maxAge 120min 且 idle 15min 轮换），单 tick 串行做「写心跳 + 判死 + 轮换 + 上限收缩」；广播负载由调用方生成（#515 收敛，取代各包自建连接表） | mcp-servers |
 | `client/i18n.js` | 客户 | 共享 `t` 活绑定 + `bindLocale`（#348 → #378 抽取；未装配回落 key 本体） | mcp-servers / provider-usage |
 | `client/ensure-style.js` | 客户 | 参数化 `ensureStyle({ id, cssText, version? })`（#477 收敛；按 id 幂等 / head 缺失静默 no-op 不抛 / version 变化重建 / 返回 disposer） | notifier / lan-proxy / provider-usage / mcp-servers |
 
 > 消费方登记为快照，新增共享模块必须同步登记消费者与行为契约（准入规则 6）。
+> 本仓库是**单插件仓库**：表中「消费方」列保留家族历史快照，当前实际消费者只有
+> `dsh-mcp-servers`（其余名字对应的包不在本仓库内）；新增模块请只登记真实消费者。
 
 ## 使用约束
 

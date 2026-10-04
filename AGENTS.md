@@ -97,9 +97,14 @@ worktree 建在仓库外的独立路径（分支名 `/` → `-`），不建在�
 
 ## 仓库约定（无副本，勿外移）
 
-- **版本适配只锚 rc**：只适配 dsh rc、不承诺 alpha。适配基线唯一事实源是
-  `pnpm-workspace.yaml` 的 catalog（peer 与其锁步）；本机 `dsh` 版本可能更高，**不得**据此
-  自行升级基线。面向用户的声明见包 README。
+- **版本适配只锚 rc**：只适配 dsh rc、不承诺 alpha。**类型层 / devDependencies 的唯一事实源**
+  是 `pnpm-workspace.yaml` 的 catalog（锁版，升级须跑全量门禁）；**peer 是宿主兼容窗口，
+  与 catalog 不是同一个量**——宿主加载插件时校验 `@deepseek-ai/dsh*` peer 是否覆盖当前
+  runtime，不覆盖即整包被跳过不加载，而 `catalog:` 在 pack 时被替换成**单一精确版本**、
+  覆盖不了新宿主。故 peer 写**累积区间**，且必须逐条登记进
+  `scripts/lib/catalog-peers-lib.ts` 的 `PEER_RANGE_ALLOWLIST`（登记值与 `package.json`
+  逐字一致；改 peer 不同步登记、或登记项腐化成死声明，`pnpm contract` 均判红）。
+  本机 `dsh` 版本可能更高，**不得**据此自行升级基线。面向用户的声明见包 README。
 - **发布物自包含**：第三方依赖一律构建期由 esbuild 内联，不以运行时 npm 依赖分发；内联
   = 分发副本，故 license 由构建链归集到 `lib/THIRD-PARTY-LICENSES`，`pack:check` 断言覆盖。
 - **客户端是干净模块**：只 `export function apply(ctx)` + `export const inject`，样式独立
@@ -124,5 +129,6 @@ worktree 建在仓库外的独立路径（分支名 `/` → `-`），不建在�
 | 发布与 release notes 的完整写法 | `.dsh/skills/dsh-plugin-release/SKILL.md` |
 | 宿主 / 客户端写法、构建契约、多端兼容、防 flake | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
 | 插件架构总览 | [docs/architecture/dsh-mcp-servers.md](docs/architecture/dsh-mcp-servers.md) |
+| 结构评估与演进路线 | [docs/architecture/dsh-mcp-servers-structure-review.md](docs/architecture/dsh-mcp-servers-structure-review.md) |
 | issue 全周期处理、标签体系与 loop 状态机 | [docs/ISSUE-WORKFLOW.md](docs/ISSUE-WORKFLOW.md) |
 | 自治维护循环（计划门 / 状态机 / 熔断） | `.dsh/skills/oss-pipeline/SKILL.md` |

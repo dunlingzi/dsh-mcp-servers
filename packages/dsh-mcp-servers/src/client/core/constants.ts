@@ -8,21 +8,47 @@
 
 import type { McpLocaleKey } from "../locales.ts";
 
-/** 与宿主端 ROUTES 一致的路径。 */
-export const API = {
-  servers: "/api/dsh-mcp-servers/servers",
-  connect: "/api/dsh-mcp-servers/servers/connect",
-  disconnect: "/api/dsh-mcp-servers/servers/disconnect",
-  reconnect: "/api/dsh-mcp-servers/servers/reconnect",
-  probe: "/api/dsh-mcp-servers/servers/probe",
-  importJson: "/api/dsh-mcp-servers/import/json",
-  session: "/api/dsh-mcp-servers/session",
-  resume: "/api/dsh-mcp-servers/resume",
-  config: "/api/dsh-mcp-servers/config",
-  events: "/api/dsh-mcp-servers/events",
-  health: "/api/dsh-mcp-servers/health",
-  toolDisable: "/api/dsh-mcp-servers/tool-disable",
+/**
+ * 宿主路由表（构建期注入，**单一事实源**）。
+ *
+ * `bundle-host` 从宿主产物读 `ROUTES`（`src/api/routes.ts`）并经 esbuild `define` 注入
+ * `__DSH_ROUTES__`——构建期直接替换为对象字面量（`build-client.ts` 的 extraDefine）。
+ * 故客户端**不再手写一份路径表**：两端一致性由构建链保证，e2e 的
+ * 「client 产物路径 == 宿主 ROUTES」断言兜底（注入缺失时该断言判红，不会静默漂移）。
+ *
+ * 注入缺失时的兜底只 warn 不抛：客户端失败策略是绝不阻塞 GUI（见 client/index.ts 头注释）；
+ * 破坏性缺失由 e2e 断言在 CI 判红。类型面（ApiRoutes）是**只读名单**，不是第二份路径表。
+ */
+type ApiRoutes = {
+  servers: string;
+  connect: string;
+  disconnect: string;
+  reconnect: string;
+  probe: string;
+  importJson: string;
+  session: string;
+  resume: string;
+  config: string;
+  events: string;
+  health: string;
+  toolDisable: string;
 };
+
+declare const __DSH_ROUTES__: ApiRoutes;
+
+/** 读取构建期注入的路由表（未注入时返回空表并 warn，绝不抛）。 */
+function injectedRoutes(): ApiRoutes {
+  try {
+    // 构建期被 esbuild define 替换为对象字面量；未注入时此处抛 ReferenceError → 由 catch 兜底
+    return __DSH_ROUTES__;
+  } catch {
+    console.warn("dsh-mcp-servers: 构建期未注入 __DSH_ROUTES__，客户端 API 路径不可用（请重跑 pnpm build）");
+    return {} as ApiRoutes;
+  }
+}
+
+/** 与宿主端 ROUTES 同源（构建期注入）的 API 路径。 */
+export const API = injectedRoutes();
 
 /** 状态分组排序（按优先级降序；titleKey 为字典 key，渲染期 t(titleKey)）。 */
 export const STATUS_ORDER = [

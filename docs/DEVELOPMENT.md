@@ -188,10 +188,23 @@ shared**；X1 保证**已准入的模块随每个消费包完整发布**（机�
 contract-check 禁止运行时值导入）。原自建类型层 `types/dsh.d.ts` 已删除（issue #48）。
 
 **版本适配策略（只适配 rc）**：官方类型层 catalog 升级以 **dsh rc 版本**为锚定
-基线（当前 `0.1.5-rc.1`），peer 与 catalog 锁步；**不对 alpha 版本适配**，除非
-维护者明确决策。升级 catalog 须跑全量门禁并核验受影响的结构（如
-SessionHeader.origin / Agent.session），并同步根 README「版本适配」与 release notes
-锚定声明。
+基线（当前 `0.1.5-rc.1`）；**不对 alpha 版本适配**，除非维护者明确决策。升级 catalog
+须跑全量门禁并核验受影响的结构（如 SessionHeader.origin / Agent.session），并同步
+根 README「版本适配」与 release notes 锚定声明。
+
+**peer 与 catalog 不是同一个量（P0 治理裁决）**：catalog 是**类型层 / devDependencies**
+的唯一事实源（锁版）；`peerDependencies` 是**宿主兼容窗口**——宿主加载 bundle 时按
+`semver.satisfies(runtime, range, { includePrerelease: true })` 校验，不覆盖即整包被跳过，
+而 `catalog:` 在 `pnpm pack` 时被替换为**单一精确版本**，覆盖不了比 catalog 更新的宿主。
+故 peer 写成累积区间，并逐条登记进 `scripts/lib/catalog-peers-lib.ts` 的
+`PEER_RANGE_ALLOWLIST`（key = `<包目录>|<包名>`）。门禁是**双向强耦合**的：
+
+- 实际值与登记值不一致 → `pnpm contract` 判红（改了 peer 必须同步登记，杜绝静默漂移）；
+- 登记项在本仓库不存在（peer 已删或已改回 `catalog:`）→ 判红（死声明）；
+- 豁免**只对 peerDependencies 生效**，devDependencies / dependencies 写区间仍判红。
+
+现行窗口是**逐代枚举**（`0.1.5-rc.2 || ^0.1.6-alpha.1 || 0.2.0-rc.2`）：宿主发布新一代
+rc 时它会直接失配，届时须先扩窗再升级宿主；长期形态建议改为向上累积（`>=0.1.5-rc.2`）。
 
 <a id="1-宿主端srcindexts规范"></a><a id="user-content-1-宿主端srcindexts规范"></a>
 ## 1. 宿主端（`src/index.ts`）规范

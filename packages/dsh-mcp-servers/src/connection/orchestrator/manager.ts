@@ -19,7 +19,7 @@ import type { ToolDefinition } from "@deepseek-ai/dsh-tools";
 import type { CatalogCache } from "../../catalog/interface.ts";
 import { normalizeServer } from "../../config/model/interface.ts";
 import { McpStore } from "../../config/store/interface.ts";
-import { ConnectionSupervisor, createTransport, MCPClient } from "../runtime/interface.ts";
+import { ConnectionSupervisor } from "../runtime/interface.ts";
 import {
   SCOPE_GLOBAL,
   SCOPE_PROJECT,
@@ -31,7 +31,6 @@ import {
 import { catalogCacheFile, summarizeToolDescriptions, makeCatalogViewFor } from "../../catalog/interface.ts";
 import type { CatalogViewResolver } from "../../catalog/interface.ts";
 import { McpMiddleware } from "../runtime/interface.ts";
-import { msgOf } from "../../pipeline/interface.ts";
 import {
   userStateFile,
   loadUserState,
@@ -42,11 +41,16 @@ import {
 } from "../../config/store/interface.ts";
 import type { MiddlewareMode, ProjectUnit, DisabledToolsMap } from "../../types/interface.ts";
 import { McpStatsCollector } from "../../stats/interface.ts";
-import { createRedactor, withTimeout } from "../../pipeline/interface.ts";
-import { stripMcpPrefix } from "./interface.ts";
-
-/** 单次探活硬超时（initialize + tools/list 全程；与连接超时无关的独立上限）。 */
-const PROBE_TIMEOUT_MS = 15_000;
+import { createRedactor } from "../../pipeline/interface.ts";
+import { probeServer } from "./probe.ts";
+import { buildSummary, middlewareUnitFor, summarizeServer } from "./summary.ts";
+import {
+  dropMiddlewareConnection,
+  ensureMiddlewareServer,
+  middlewareTakes,
+  touchGlobalUnit,
+} from "./middleware-bridge.ts";
+import { reconcileServers, startAll, startServer } from "./reconcile.ts";
 
 /**
  * 管理器：持有全局存储 + 当前会话项目的项目级存储、每个服务器的监督器
@@ -127,36 +131,15 @@ export class McpServers {
     this.registerQueue = Promise.resolve();
   }
 
-  /** 单次探活（设置页「测试」按钮）：对目标服务器做一次性 MCP 连接
-   * （initialize + tools/list，报告延迟与工具数），连接即断、不改任何连接
-   * 状态、不注册工具——与 supervisor/中间层连接池完全独立。
+  /** 单次探活（设置页「测试」按钮）：实现见 orchestrator/probe.ts（P3 拆分）。
    * 返回 { ok, latencyMs, toolCount?, serverInfo?, error? }（未找到抛错）。 */
   async probe(name: string, scope: string = SCOPE_GLOBAL): Promise<Record<string, unknown>> {
-    const store = scope === SCOPE_PROJECT ? await this.projectStoreOrThrow() : this.store;
-    let server = store.find(name);
-    // runtime 注入条目不落 store：global scope 查不到时回退 runtimeRegistry（与 connect 同口径）。
-    if (server === undefined && scope === SCOPE_GLOBAL) {
-      const runtime = this.runtimeRegistry.get(name);
-      if (runtime !== undefined) server = runtime;
-    }
-    if (server === undefined) throw new Error(`server "${name}" not found in ${scope} scope`);
-    const startedAt = Date.now();
-    const transport = createTransport(server);
-    const client = new MCPClient(transport);
-    try {
-      const serverInfo = await withTimeout(client.initialize(), PROBE_TIMEOUT_MS, `probe initialize timed out (${PROBE_TIMEOUT_MS}ms)`);
-      const tools = await withTimeout(client.listTools(), PROBE_TIMEOUT_MS, `probe tools/list timed out (${PROBE_TIMEOUT_MS}ms)`);
-      const toolList = Array.isArray((tools as { tools?: unknown[] })?.tools) ? (tools as { tools: unknown[] }).tools : [];
-      return { ok: true, latencyMs: Date.now() - startedAt, toolCount: toolList.length, serverInfo };
-    } catch (error) {
-      return { ok: false, latencyMs: Date.now() - startedAt, error: this.redactError(error) };
-    } finally {
-      try {
-        await transport.close();
-      } catch {
-        // 子进程已退出 / 连接未建立：close 失败不影响探活结论
-      }
-    }
+    return probeServer({
+      globalStore: this.store,
+      projectStoreOrThrow: () => this.projectStoreOrThrow(),
+      runtimeRegistry: this.runtimeRegistry,
+      redact: (error) => this.redactError(error),
+    }, name, scope);
   }
 
   /** 从磁盘加载目录缓存（损坏/缺失 → 空缓存，不崩溃）。 */
@@ -538,247 +521,47 @@ export class McpServers {
     if (changed) this.emitStatus();
   }
 
-  /**
-   * 按当前配置同步 supervisor：配置中移除/禁用的断开，新增/恢复的启动。
-   * 同步方法（start/stop 均为同步登记 + 异步连接）；防重入（读取路径可并发）。
-   * @returns {boolean} 是否有连接集合变化
-   */
+  /** 配置驱动的连接集合收敛（实现在 orchestrator/reconcile.ts；成员名与位置保持以维持类声明形状）。 */
   reconcileServers(): boolean {
-    if (this.reconcileBusy) return false;
-    this.reconcileBusy = true;
-    try {
-      const desired = new Map();
-      for (const server of this.store.data.servers) {
-        desired.set(server.name, { server, scope: SCOPE_GLOBAL });
-      }
-      if (this.projectStore !== undefined) {
-        for (const server of this.projectStore.data.servers) {
-          // 同名项目级被全局顶掉（与 start 的跨 scope 冲突策略一致）。
-          if (!desired.has(server.name)) desired.set(server.name, { server, scope: SCOPE_PROJECT });
-        }
-      }
-      // 双轨合并：runtimeRegistry（内存态，运行时注入）并入 desired，同名 runtime 优先。
-      // 中间层模式：#413 起 all 模式 runtime 归一中台（同 store 全局走 @global 单元），
-      // project 模式 runtime 仍全局 supervisor 路径。
-      for (const [name, server] of this.runtimeRegistry) {
-        desired.set(name, { server, scope: SCOPE_GLOBAL });
-      }
-      let changed = false;
-      for (const [name, supervisor] of [...this.supervisors]) {
-        const want = desired.get(name);
-        // 中间层接管（与 start 同口径单一事实源 middlewareTakes）：停掉不该以
-        // supervisor 形态存在的连接（#413：all 模式 runtime 亦被接管，同样停）。
-        const middlewareTakes = this.middlewareTakes(name, supervisor.scope);
-        if (want === undefined || want.server.enabled === false || want.scope !== supervisor.scope || middlewareTakes) {
-          this.stop(name);
-          changed = true;
-        }
-      }
-      for (const [name, want] of desired) {
-        if (want.server.enabled === false) continue;
-        // project 模式项目级：由中间层单元管理（ensureMiddlewareServer 幂等触达，#616），
-        // 不经 start；all 模式全局照常 start——start 内部下沉接管（触达 @global）。
-        if (this.middlewareMode === "project" && want.scope === SCOPE_PROJECT) continue;
-        const existing = this.supervisors.get(name);
-        if (existing === undefined || existing.scope !== want.scope) {
-          this.start(name, want.scope);
-          // all 模式全局接管路径（start 内部触达池）不建 supervisor——池连接
-          // 变化由 connectInternal emitStatus 上报，不计入 supervisor 集合变化。
-          if (!this.middlewareTakes(name, want.scope)) changed = true;
-        }
-      }
-      return changed;
-    } finally {
-      this.reconcileBusy = false;
-    }
+    return reconcileServers(this, {
+      middlewareTakes: (name, scope) => this.middlewareTakes(name, scope),
+      stop: (name) => this.stop(name),
+      start: (name, scope) => this.start(name, scope),
+    });
   }
 
+  /** 启动全部 enabled 的全局服务器（实现在 orchestrator/reconcile.ts）。 */
   async startAll(): Promise<void> {
-    for (const server of this.store.data.servers) {
-      if (server.enabled !== false) this.start(server.name, SCOPE_GLOBAL);
-    }
+    startAll(this, (name, scope) => this.start(name, scope));
   }
 
-  /**
-   * 启动服务器监督器。
-   * @param name 服务器名
-   * @param scope 作用域（全局/项目）
-   * @param directConfig 运行时 config 直传（registerServer 注入路径；缺省读 store）。
-   *   修 P0（评审③）：同名 runtime 优先生效——store 已有同名时，直传 config 优先于 store 版本。
-   */
+  /** 启动服务器监督器（实现在 orchestrator/reconcile.ts：中间层接管下沉 / 跨 scope 冲突 / 代际替换）。 */
   start(name: string, scope: string = SCOPE_GLOBAL, directConfig?: ServerConfig): void {
-    let server = directConfig;
-    if (server === undefined) {
-      const store = scope === SCOPE_PROJECT ? this.projectStore : this.store;
-      if (store === undefined) return;
-      server = store.find(name);
-      // F2（#382）：runtime 注入条目不落 store——global scope 查不到时回退
-      // runtimeRegistry（双轨合并，与 summary/catalogServersFor 同口径），修
-      // 修 runtime 注册服务器「浮窗重连断开后连不回」。仅限 global：
-      // project 回退会把 runtime 条目挂错 scope，被下次 reconcile 无声停掉。
-      if (server === undefined && scope === SCOPE_GLOBAL) {
-        const runtime = this.runtimeRegistry.get(name);
-        if (runtime !== undefined) {
-          this.logger.warn(`dsh-mcp-servers: server "${name}" not in store; using runtime registry entry`);
-          server = runtime;
-        }
-      }
-    }
-    if (server === undefined) return;
-    // F3（#382）：中间层接管判定下沉到 start（与 reconcileServers 同口径，见
-    // middlewareTakes）。all 模式全局非 runtime 不建 supervisor——杜绝「先建
-    // supervisor 再被 reconcile 停掉」的竞态窗口（热更新后 mcp__ 注册残留 →
-    // 中间层防双进程探测命中且无重试 → 掉线），改触达 @global 单元惰性连接；
-    // 中间层模式项目级不建 supervisor，走 ensureMiddlewareServer 幂等触达。
-    // startAll / add / update / reconcile 各入口自动收敛，无需逐处特判。
-    //
-    // #616 根因修复：项目级分支此前是 touchMiddlewareUnit()（teardownUnit 拆毁
-    // 整个当前项目单元）。reconcileServers 对项目级条目（supervisors 恒无）每次
-    // 都会走到 start——浮窗连接/断开任意服务器（saveUserState 写 ~/.dsh → 全局
-    // fs.watch → refreshFromDisk → reconcile）就会把当前项目单元连人带连接整个
-    // 拆掉，且拆后无任何 projectUnitFor 触达，项目级全部显示/实际断开，直到
-    // 切换工作目录（setSession → projectUnitFor）才重建。改为与 touchGlobalUnit
-    // 对称的幂等触达（确保单元存在 + 确保该服务器连接），reconcile 不再有拆毁
-    // 副作用。
-    if (this.middlewareTakes(name, scope)) {
-      if (scope === SCOPE_PROJECT) this.ensureMiddlewareServer(name);
-      else this.touchGlobalUnit(name);
-      return;
-    }
-    const existing = this.supervisors.get(name);
-    if (existing !== undefined && existing.client !== undefined) {
-      // 已连接：若现有 config 与直传 config 不同（runtime 注入覆盖 store），重建。
-      if (directConfig !== undefined && existing.server !== directConfig) {
-        // B5/D2：替换分支复用 disconnect 语义（关闭旧 transport + 注销旧工具），
-        // 而非只置 disposed——旧代际残留泄漏 stdio 子进程/socket 与工具注册。
-        // start 保持同步：void disconnect() 的清理与新代际 syncTools 在各自
-        // syncChain 上先后落定（D2：旧清理先于新注册）。
-        void existing.disconnect();
-        const supervisor = new ConnectionSupervisor(this, directConfig, scope);
-        this.supervisors.set(name, supervisor);
-        void supervisor.connect();
-      }
-      return;
-    }
-    if (existing !== undefined && existing.scope !== scope) {
-      // 同名服务器跨 scope 冲突：工具名会重复，拒绝启动
-      this.logger.warn(`dsh-mcp-servers: server "${name}" already registered in scope "${existing.scope}" — skipping "${scope}"`);
-      return;
-    }
-    // B5：未连接旧代际同样走 disconnect 语义（清 reconnectTimer + 注销残留工具）。
-    if (existing !== undefined) void existing.disconnect();
-    const supervisor = new ConnectionSupervisor(this, server, scope);
-    this.supervisors.set(name, supervisor);
-    void supervisor.connect();
+    startServer(this, {
+      middlewareTakes: (n, s) => this.middlewareTakes(n, s),
+      ensureMiddlewareServer: (n) => this.ensureMiddlewareServer(n),
+      touchGlobalUnit: (n) => this.touchGlobalUnit(n),
+    }, name, scope, directConfig);
   }
 
-  /**
-   * 中间层接管判定（start / reconcileServers 单一口径）：中间层模式的项目级，
-   * 或 all 模式的全局级（**含 runtime 注入条目**，#413 消除豁免——all 模式
-   * 统一无 mcp__ 前缀直呼，runtime 封装定义服务器经中间层目录投影 + callTool
-   * 直呼执行；project / off 模式 runtime 照旧 supervisor 路径注册 mcp__ 工具）。
-   */
+  /** 中间层接管判定（实现在 orchestrator/middleware-bridge.ts；成员名与位置保持以维持类声明形状）。 */
   private middlewareTakes(name: string, scope: string): boolean {
-    if (this.middlewareMode === "off" || this.middleware === undefined) return false;
-    if (scope === SCOPE_PROJECT) return true;
-    return this.middlewareMode === "all" && scope === SCOPE_GLOBAL;
+    return middlewareTakes(this, name, scope);
   }
 
-  /**
-   * 触达 @global 单元并确保该全局服务器连接（all 模式 start 接管路径）。
-   * projectUnitFor 首次触达会连带惰性连接全部全局服务器，等价 startAll 语义；
-   * userDisabled 命中不连（与浮窗断开语义一致）。
-   */
+  /** 触达 @global 单元并确保该全局服务器连接（实现在 orchestrator/middleware-bridge.ts）。 */
   private touchGlobalUnit(name: string): void {
-    const mw = this.middleware;
-    if (mw === undefined) return;
-    void mw.projectUnitFor(MIDDLEWARE_GLOBAL_ROOT)
-      .then((unit) => {
-        if (unit === undefined || unit.userDisabled.has(name)) return;
-        void mw.ensureConnected(MIDDLEWARE_GLOBAL_ROOT, name);
-      })
-      .catch((error: unknown) => {
-        // #392 遗留⑥：不再静默吞错——projectUnitFor 失败时打 warn 日志，
-        // 否则该服务器永不连接且无迹可查（ensureConnected 调用面仍会尝试）。
-        this.logger.warn(`dsh-mcp-servers: touchGlobalUnit(${name}) failed: ${this.redactError(error)}`);
-      });
+    touchGlobalUnit(this, (error) => this.redactError(error), name);
   }
 
-  /**
-   * 幂等触达当前项目单元并确保该服务器连接（#616：start 的中间层项目级接管路径，
-   * 取代旧 touchMiddlewareUnit 的整单元拆毁语义）。
-   * - 单元缺失（宿主重启 / 首次 reconcile）：projectUnitFor 创建 + 惰性连接全部；
-   * - 单元已存在（配置热重载 / 误触发的 reconcile）：保留既有连接，仅对**该**服务器
-   *   ensureConnected（connected/connecting 短路，幂等）；
-   * - entry 已存在但 store 配置已变（手工编辑 mcp.json 热重载）：force 单台重建——
-   *   旧实现的配置生效来自整单元拆毁的副作用，此处改为精确到单台，不殃及同单元
-   *   其他连接。
-   * userDisabled 命中不连（与浮窗断开语义一致）；无活动项目 root 静默返回
-   * （与旧 touchMiddlewareUnit 同口径）。
-   */
+  /** 幂等触达当前项目单元并确保该服务器连接（实现在 orchestrator/middleware-bridge.ts）。 */
   private ensureMiddlewareServer(name: string): void {
-    const mw = this.middleware;
-    if (mw === undefined || this.projectRoot === undefined) return;
-    // 入口捕获 root（评审 P2-3）：.then 回调内不再读 this.projectRoot——
-    // setSession 切换后实例字段已变，沿用调用时快照保证 root 与 unit 配套。
-    const root = this.projectRoot;
-    void mw.projectUnitFor(root)
-      .then(async (unit) => {
-        if (unit === undefined || unit.userDisabled.has(name)) return;
-        const current = this.projectStore?.find(name);
-        const entry = unit.connections.get(name);
-        // 配置一致性比对（同源 store 实例）：未重载时 entry.server 与 current
-        // 为同一对象引用恒等；真变更必经 reloadIfChanged → load() 整组换新
-        // 对象（键序由 normalizeServer 固定），内容不同则串必不同——假阴性
-        // 不存在；唯一假阳性是用户手排 mcp.json 键序（值不变）触发一次性
-        // force 重连，重建后自愈、不循环。
-        if (entry !== undefined && current !== undefined && JSON.stringify(entry.server) !== JSON.stringify(current)) {
-          await mw.ensureConnected(root, name, { force: true });
-          return;
-        }
-        await mw.ensureConnected(root, name);
-      })
-      .catch((error: unknown) => {
-        this.logger.warn(`dsh-mcp-servers: ensureMiddlewareServer(${name}) failed: ${this.redactError(error)}`);
-      });
+    ensureMiddlewareServer(this, (error) => this.redactError(error), name);
   }
 
-  /**
-   * 拆除中间层池中该 server 的连接（update/remove 配置变更后强制重建；
-   * 不写 userDisabled——与 disconnect 的禁用语义区分）。此前 update/remove 仅
-   * 处理项目单元，all 模式全局池连接与目录残留导致「已删服务器仍可调用」。
-   */
+  /** 拆除中间层池中该 server 的连接（实现在 orchestrator/middleware-bridge.ts）。 */
   private dropMiddlewareConnection(name: string): void {
-    const mw = this.middleware;
-    if (mw === undefined) return;
-    let dropped = false;
-    for (const unit of mw.units.values()) {
-      const entry = unit.connections.get(name);
-      if (entry !== undefined) {
-        dropped = true;
-        entry.disposed = true;
-        if (entry.reconnectTimer !== undefined) clearTimeout(entry.reconnectTimer);
-        const client = entry.client;
-        entry.client = undefined;
-        entry.transport = undefined;
-        if (client !== undefined && client.transport !== undefined) void client.transport.close().catch(() => {});
-        unit.connections.delete(name);
-      }
-      // #392 遗留①：目录条目随连接一并拆除——remove/update 后已删服务器不再以
-      // 幽灵条目出现在 ws_mcp_list / ws_mcp_search（此前只拆连接，目录 TTL 内残留）。
-      // 内存目录先行删除；磁盘 last-good 缓存异步同步（防重启后 loadCatalogCache
-      // 把幽灵条目载回——persistCatalog 空采集不写盘，remove 后目录可能为空，必须
-      // 显式清盘而非依赖全量覆盖写）。
-      if (unit.catalog.delete(name)) {
-        dropped = true;
-        void mw.removeCatalogEntry(unit.root, name).catch(() => {});
-      }
-    }
-    // 拆除即废弃同名在途建连标记：entry 被强拆后旧 attempt 仍可能 pending 至
-    // CONNECT_TIMEOUT_MS，残留去重标记会吞掉 remove/update 后的同名重连（含
-    // 重加配置立即重建）——详见 middleware.abandonInFlight 不变式。
-    mw.abandonInFlight(name);
-    if (dropped) this.emitStatus();
+    dropMiddlewareConnection(this, () => this.emitStatus(), name);
   }
 
   stop(name: string): void {
@@ -995,102 +778,19 @@ export class McpServers {
     await this.connect(name, scope);
   }
 
-  /** 面板数据：配置 + 实时状态 + 工具列表 + 项目信息。 */
+  /** 面板数据：配置 + 实时状态 + 工具列表 + 项目信息（实现见 orchestrator/summary.ts）。 */
   summary(): Record<string, unknown> {
-    const servers: Record<string, unknown>[] = [];
-    for (const server of this.store.data.servers) {
-      servers.push(this.summarize(server, SCOPE_GLOBAL));
-    }
-    if (this.projectStore !== undefined) {
-      for (const server of this.projectStore.data.servers) {
-        servers.push(this.summarize(server, SCOPE_PROJECT));
-      }
-    }
-    // 查询面完整性（#329 评审修正）：runtime 条目并入 summary，
-    // 否则 getStatus/list 看不到运行时注册的服务器（消费方无法感知状态）。
-    for (const server of this.runtimeRegistry.values()) {
-      servers.push(this.summarize(server, SCOPE_GLOBAL));
-    }
-    const byStatus: Record<string, number> = { connected: 0, connecting: 0, reconnecting: 0, disabled: 0, stopped: 0, failed: 0 };
-    for (const server of servers) byStatus[server.status as string] = (byStatus[server.status as string] ?? 0) + 1;
-    return {
-      cwd: this.projectRoot ?? undefined,
-      projectRoot: this.projectRoot ?? undefined,
-      servers,
-      counts: byStatus,
-      middlewareMode: this.middlewareMode,
-    };
+    return buildSummary(this, (name, scope) => this.middlewareTakes(name, scope));
   }
 
-  /**
-   * 中间层投影单元：该 server 在当前模式下由中间层接管时返回其所在单元，
-   * 否则 undefined（supervisor 路径照旧）。project 模式仅项目级走池；
-   * all 模式全局也经虚拟 root @global 走池（与 reconcileServers 的
-   * middlewareTakes 判定同口径）。
-   */
+  /** 中间层投影单元（实现见 orchestrator/summary.ts；保留成员与位置以维持类声明形状）。 */
   private middlewareUnitFor(serverName: string, scope: string): ProjectUnit | undefined {
-    const mw = this.middleware;
-    if (mw === undefined || this.middlewareMode === "off") return undefined;
-    // 与 start/reconcileServers 同口径（#382 F4 + #413）：all 模式全局（含
-    // runtime 注入条目）映射 @global 单元。
-    if (!this.middlewareTakes(serverName, scope)) return undefined;
-    const root = scope === SCOPE_PROJECT ? this.projectRoot : MIDDLEWARE_GLOBAL_ROOT;
-    return root === undefined ? undefined : mw.units.get(root);
+    return middlewareUnitFor(this, (name, sc) => this.middlewareTakes(name, sc), serverName, scope);
   }
 
+  /** 单台服务器投影（实现见 orchestrator/summary.ts）。 */
   summarize(server: ServerConfig, scope: string): Record<string, unknown> {
-    // 中间层模式（#228 回归修复）：被中间层接管的服务器从连接池 + 目录缓存
-    // 投影状态与工具列表——此前只读 supervisors，项目级无 supervisor 条目恒
-    // 兜底 "stopped"，浮窗/summary 与真实连接态脱节。返回形状不变。
-    const unit = this.middlewareUnitFor(server.name, scope);
-    if (unit !== undefined) {
-      const entry = unit.connections.get(server.name);
-      if (entry !== undefined) {
-        const catalog = unit.catalog.get(server.name);
-        const disabledTools = this.disabledTools.get(unit.root)?.get(server.name);
-        const globalTools = unit.root === MIDDLEWARE_GLOBAL_ROOT ? undefined : this.disabledTools.get(MIDDLEWARE_GLOBAL_ROOT)?.get(server.name);
-        const tools = catalog !== undefined && catalog.unavailable === undefined ? [...catalog.tools.keys()] : [];
-        const disabledList = tools.filter((tool) => (disabledTools?.has(tool) ?? false) || (globalTools?.has(tool) ?? false));
-        return {
-          ...server,
-          scope,
-          status: entry.status,
-          // 目录发现失败（unavailable）时透出原因：解释 connected 却 0 工具。
-          error: entry.error !== undefined ? msgOf(entry.error) : catalog?.unavailable,
-          tools,
-          disabledTools: disabledList.length > 0 ? disabledList : undefined,
-        };
-      }
-      // #382 F4：userDisabled 短路——池中已断开（用户浮窗断开）的服务器不再落
-      // supervisor 分支（all 模式全局经池接管后 supervisor 不复存在；同名 runtime
-      // 残留时也不误显示其连接态）。#234 注释前提（全局 connect 走 supervisor 复活）
-      // 随 F4 消失。
-      if (unit.userDisabled.has(server.name)) {
-        return { ...server, scope, status: "stopped", error: undefined, tools: [] };
-      }
-    }
-    const supervisor = this.supervisors.get(server.name);
-    // #382 F4：展示口径统一裸名——剥 mcp__<server>__ 前缀（与中间层投影分支、
-    // 工具级禁用表键、guard 层反解口径一致；此前浮窗禁用提交带前缀名而 guard
-    // 查裸名，禁用静默无效）。超长哈希名剥出截断键，与 guard 路径二反解结果
-    // 相同，禁用链路一致生效；前缀不匹配（不可剥）原样返回。
-    const supervisorTools = (supervisor?.tools ?? []).map((tool) => stripMcpPrefix(tool, server.name));
-    // B19：禁用查询与中间层分支同口径——@global 与 projectRoot 禁用集**合并判定**
-    // （现状 ?? 二者只取其一，跨空间禁用漏算）。@global 跨工作空间共享、项目根
-    // 目录级追加，任一命中即禁用。
-    const globalDisabled = this.disabledTools.get(MIDDLEWARE_GLOBAL_ROOT)?.get(server.name);
-    const projectDisabled = this.projectRoot !== undefined ? this.disabledTools.get(this.projectRoot)?.get(server.name) : undefined;
-    const supervisorDisabled = supervisorTools.filter(
-      (tool) => (globalDisabled?.has(tool) ?? false) || (projectDisabled?.has(tool) ?? false),
-    );
-    return {
-      ...server,
-      scope,
-      status: supervisor?.status ?? (server.enabled === false ? "disabled" : "stopped"),
-      error: supervisor?.error !== undefined ? (supervisor.error as Error).message : undefined,
-      tools: supervisorTools,
-      disabledTools: supervisorDisabled.length > 0 ? supervisorDisabled : undefined,
-    };
+    return summarizeServer(this, (name, sc) => this.middlewareTakes(name, sc), server, scope);
   }
 
   async dispose(): Promise<void> {

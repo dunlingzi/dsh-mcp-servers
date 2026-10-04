@@ -11,6 +11,7 @@
  */
 
 import { api } from "./api.ts";
+import { API } from "./constants.ts";
 
 /** apply 与设置页共享的会话状态（cwd 由本模块维护，页面读取用于查询参数）。 */
 export interface SharedSessionState {
@@ -24,7 +25,7 @@ export function createSharedSessionState(): SharedSessionState {
 
 /** 强制重绑当前会话（绕过 cwd 未变短路；宿主 setSession 幂等）。 */
 export function rebindSession(shared: SharedSessionState): Promise<unknown> {
-  return api("/api/dsh-mcp-servers/session", {
+  return api(API.session, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ cwd: typeof shared.currentCwd === "string" ? shared.currentCwd : "" }),
@@ -56,7 +57,7 @@ export function bindSession(ctx: any, shared: SharedSessionState): () => void {
     const prevCwd = shared.currentCwd;
     shared.currentCwd = typeof cwd === "string" ? cwd : undefined;
     if (cwd === prevCwd) return;
-    void api("/api/dsh-mcp-servers/session", {
+    void api(API.session, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ cwd: typeof cwd === "string" ? cwd : "" }),

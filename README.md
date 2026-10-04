@@ -53,8 +53,11 @@ pnpm gate:full       # 发版前全量口径
 
 ## 版本适配（只适配 rc）
 
-只适配 dsh rc、不承诺 alpha。适配基线唯一事实源是 `pnpm-workspace.yaml` 的
-`catalog`（peer 与其锁步）；升级须跑全量门禁并核验会话结构。
+只适配 dsh rc、不承诺 alpha。**类型层 / devDependencies** 的唯一事实源是
+`pnpm-workspace.yaml` 的 `catalog`（锁版）；**peer 是宿主兼容窗口**——宿主按
+`@deepseek-ai/dsh*` peer 是否覆盖当前 runtime 决定是否加载本插件，故 peer 写累积区间，
+并逐条登记进 `scripts/lib/catalog-peers-lib.ts` 的 `PEER_RANGE_ALLOWLIST`
+（区间与 package.json 逐字一致，否则 `pnpm contract` 判红）。升级须跑全量门禁并核验会话结构。
 
 ## License
 

@@ -27,6 +27,13 @@ test('真实仓库：catalog ↔ peer 零违规', () => {
   assert.ok(officialPeerCount >= 5, `官方 peer 应覆盖本包全部声明，实际 ${officialPeerCount}`)
 })
 
+test('真实仓库：宿主兼容区间 peer 全部命中豁免登记且逐字一致', () => {
+  // P0：5 个官方 peer 走区间豁免（catalog: 在 pack 时被替换为单一精确版本，覆盖不了
+  // 新宿主）。数量与命中数绑定——漏登记 / 登记值漂移都会让 problems 非空或此处不等。
+  const { peerRangeCount } = checkCatalogPeers(ROOT)
+  assert.equal(peerRangeCount, 5, `应有 5 个 peer 命中区间豁免，实际 ${peerRangeCount}`)
+})
+
 test('parseCatalog：只取 catalog 段，不被后续顶层段污染', () => {
   const yaml = [
     'catalog:',
@@ -46,9 +53,13 @@ test('parseReleaseExclude：剥离 @version 后缀', () => {
   assert.ok(parseReleaseExclude(yaml).has('@deepseek-ai/dsh-session'))
 })
 
+/** 负向用例的默认豁免表：空表，用于把「豁免登记」这条判据隔离出去。 */
+const NO_PEER_EXEMPTIONS = new Map()
+
 /** 造最小仓库副本：pnpm-workspace.yaml + 一个带官方 peer 的包。 */
 function makeRepo({
   peer = 'catalog:',
+  dev,
   catalogLine = "  '@deepseek-ai/dsh-session': 0.1.2-rc.1",
   excludeLine = "  - '@deepseek-ai/dsh-session@0.1.2-rc.1'",
 } = {}) {
@@ -60,7 +71,11 @@ function makeRepo({
   mkdirSync(join(dir, 'packages', 'dsh-probe'), { recursive: true })
   writeFileSync(
     join(dir, 'packages', 'dsh-probe', 'package.json'),
-    JSON.stringify({ name: 'probe', peerDependencies: { '@deepseek-ai/dsh-session': peer } }, null, 2),
+    JSON.stringify({
+      name: 'probe',
+      peerDependencies: { '@deepseek-ai/dsh-session': peer },
+      ...(dev === undefined ? {} : { devDependencies: { '@deepseek-ai/dsh-session': dev } }),
+    }, null, 2),
   )
   return dir
 }
@@ -74,9 +89,9 @@ function withRepo(options, fn) {
   }
 }
 
-test('负向：peer 写显式字面版本 → 判红', () => {
+test('负向：peer 写显式字面版本且未登记 → 判红', () => {
   withRepo({ peer: '0.1.2-rc.1' }, (dir) => {
-    const { problems } = checkCatalogPeers(dir)
+    const { problems } = checkCatalogPeers(dir, NO_PEER_EXEMPTIONS)
     assert.equal(problems.length, 1)
     assert.match(problems[0], /一律写 catalog:/)
   })
@@ -84,16 +99,59 @@ test('负向：peer 写显式字面版本 → 判红', () => {
 
 test('负向：catalog: 引用无对应条目 → 判红', () => {
   withRepo({ catalogLine: "  '@deepseek-ai/other': 1.0.0", excludeLine: "  - '@deepseek-ai/other@1.0.0'" }, (dir) => {
-    const { problems } = checkCatalogPeers(dir)
+    const { problems } = checkCatalogPeers(dir, NO_PEER_EXEMPTIONS)
     assert.ok(problems.some((p) => /无此 catalog 条目/.test(p)), `实际: ${JSON.stringify(problems)}`)
   })
 })
 
 test('负向：catalog 键未登记供应链豁免清单 → 判红', () => {
   withRepo({ excludeLine: "  - '@deepseek-ai/unrelated@1.0.0'" }, (dir) => {
-    const { problems } = checkCatalogPeers(dir)
+    const { problems } = checkCatalogPeers(dir, NO_PEER_EXEMPTIONS)
     assert.ok(
       problems.some((p) => /未登记进 minimumReleaseAgeExclude/.test(p)),
+      `实际: ${JSON.stringify(problems)}`,
+    )
+  })
+})
+
+// ------------------------------------------------ P0：peer 区间豁免（双向强耦合）
+
+const FIXTURE_EXEMPTION = new Map([
+  ['dsh-probe|@deepseek-ai/dsh-session', { range: '0.1.2-rc.1', reason: 'fixture' }],
+])
+
+test('正向：peer 区间与豁免登记逐字一致 → 不判红', () => {
+  withRepo({ peer: '0.1.2-rc.1' }, (dir) => {
+    const { problems, peerRangeCount } = checkCatalogPeers(dir, FIXTURE_EXEMPTION)
+    assert.deepEqual(problems, [])
+    assert.equal(peerRangeCount, 1)
+  })
+})
+
+test('负向：peer 值偏离豁免登记值 → 判红', () => {
+  withRepo({ peer: '>=0.1.2-rc.1' }, (dir) => {
+    const { problems, peerRangeCount } = checkCatalogPeers(dir, FIXTURE_EXEMPTION)
+    assert.equal(peerRangeCount, 0)
+    assert.ok(
+      problems.some((p) => /与 peer 豁免登记值/.test(p)),
+      `实际: ${JSON.stringify(problems)}`,
+    )
+  })
+})
+
+test('负向：豁免登记项在本仓库不存在 → 死声明判红', () => {
+  withRepo({}, (dir) => {
+    const ghost = new Map([['dsh-probe|@deepseek-ai/dsh-ghost', { range: '>=1.0.0', reason: 'fixture' }]])
+    const { problems } = checkCatalogPeers(dir, ghost)
+    assert.ok(problems.some((p) => /死声明/.test(p)), `实际: ${JSON.stringify(problems)}`)
+  })
+})
+
+test('负向：豁免只对 peerDependencies 生效，devDependencies 写字面量仍判红', () => {
+  withRepo({ peer: '0.1.2-rc.1', dev: '0.1.2-rc.1' }, (dir) => {
+    const { problems } = checkCatalogPeers(dir, FIXTURE_EXEMPTION)
+    assert.ok(
+      problems.some((p) => /devDependencies\["@deepseek-ai\/dsh-session"\]/.test(p)),
       `实际: ${JSON.stringify(problems)}`,
     )
   })

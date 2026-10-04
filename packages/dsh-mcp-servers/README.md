@@ -172,8 +172,12 @@ await ctx.mcpServers.registerServer({
 
 ## 测试
 
-测试单份维护、变异自动覆盖：单元测试只维护 `test/*.test.ts`（`import "../../lib/index.js"` 或直连 src）；
-stryker 经 lib→src hook 复用同一份断言，无需手工同步副本。
+测试单份维护、变异自动覆盖（#423 方案 A / #722）：测试按**机制**分三层放在 `test/unit`、
+`test/integration`、`test/e2e`（共 16 个文件，与包内 `--min 16` 一致），变异面测试清单由
+`vitest.stryker.d/dsh-mcp-servers.config.ts` 从变异拓扑派生——**单元 / 集成层直连 `src/`**
+（不再经 `lib/` 或 lib→src hook，该 hook 已随 #722 退役）；`e2e/` 与 `client/` 层读产物、
+不进变异面。新增测试文件后的固定动作：放进对应层目录 →
+`node scripts/gate/gen-stryker-conf.mjs --sync-test-min` → `pnpm stryker:gen`。
 
 ```sh
 # 健康检查（回环）

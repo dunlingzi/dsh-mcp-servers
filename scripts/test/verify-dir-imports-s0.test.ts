@@ -350,6 +350,39 @@ test('--zones：R-A 双口径计数与明细（合法跨域引用：旧口径 2 
   }
 })
 
+test('#P3 尺子：raLegacy 按模块对去重——同模块多文件拆分不抬高存量', () => {
+  // 动机（实测）：P3 拆出两个同域实现文件后，旧口径把同一批 import 复制计数 → 86 → 95，
+  // 而模块级依赖图完全未变。去重后：同一 (模块 → 模块) 对无论由几个文件发起，只计 1 条；
+  // 明细仍逐条打印（自述与实现同源：条数去重、明细不丢）。
+  const base = {
+    [`${SRC}/a/interface.ts`]: 'export { A } from "./impl.ts";\n',
+    [`${SRC}/a/impl.ts`]: 'export const A = 1;\n',
+  }
+  const split = makeFixtureRoot({
+    ...base,
+    [`${SRC}/b/interface.ts`]: 'export { B1 } from "./impl-a.ts";\nexport { B2 } from "./impl-b.ts";\n',
+    [`${SRC}/b/impl-a.ts`]: 'import { A } from "../a/interface.ts";\nexport const B1 = A;\n',
+    [`${SRC}/b/impl-b.ts`]: 'import { A } from "../a/interface.ts";\nexport const B2 = A;\n',
+  })
+  const single = makeFixtureRoot({
+    ...base,
+    [`${SRC}/b/interface.ts`]: 'export { B1 } from "./impl-a.ts";\n',
+    [`${SRC}/b/impl-a.ts`]: 'import { A } from "../a/interface.ts";\nexport const B1 = A;\n',
+  })
+  try {
+    const a = runOn(split, ['--zones'])
+    const b = runOn(single, ['--zones'])
+    assert.equal(a.status, 0, `拆分形态应 PASS：\n${a.out}`)
+    assert.match(a.out, /旧口径）：1 条（值 1 \/ type 0）/, `两文件同模块对应去重为 1：\n${a.out}`)
+    assert.match(b.out, /旧口径）：1 条（值 1 \/ type 0）/, `单文件同模块对为 1：\n${b.out}`)
+    assert.match(a.out, /b\/impl-a\.ts → a\/interface\.ts \[value\]/, `应列出第一条明细：\n${a.out}`)
+    assert.match(a.out, /b\/impl-b\.ts → a\/interface\.ts \[value\]/, `应列出第二条明细：\n${a.out}`)
+  } finally {
+    rmSync(split, { recursive: true, force: true })
+    rmSync(single, { recursive: true, force: true })
+  }
+})
+
 test('--zones：impl 直引他域实现文件在新口径下计数为 1', () => {
   const root = makeFixtureRoot({
     [`${SRC}/a/interface.ts`]: 'export { A } from "./impl.ts";\n',

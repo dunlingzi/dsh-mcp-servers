@@ -152,13 +152,16 @@ if (checked === 0) {
 console.log(failed === 0 ? '客户端契约：全部通过' : `客户端契约：${failed} 个失败`)
 // #695：catalog ↔ peer/devDeps 一致性——官方类型层版本事实源收敛到 catalog 一处后，
 // 本段防「peer 写回字面量 / catalog: 引用无条目 / 供应链豁免清单漂移」。
+// P0 治理裁决：peer 是**宿主兼容窗口**（catalog: 在 pack 时被替换为单一精确版本，
+// 覆盖不了新宿主），故 peer 允许写区间但须登记进 PEER_RANGE_ALLOWLIST 且逐字一致；
+// devDeps / deps 仍一律 catalog:。
 {
   const peers = checkCatalogPeers(ROOT)
   console.log('\ncatalog-peers:')
   for (const line of peers.lines) console.log(`  ${line}`)
   for (const problem of peers.problems) console.log(`FAIL catalog-peers | ${problem}`)
   if (peers.problems.length > 0) {
-    console.log('hint catalog-peers | 官方依赖请只改 pnpm-workspace.yaml catalog（并同步 minimumReleaseAgeExclude），package.json 一律写 catalog:；补齐后重跑 pnpm contract')
+    console.log('hint catalog-peers | devDependencies/dependencies 一律写 catalog:（改 pnpm-workspace.yaml catalog 并同步 minimumReleaseAgeExclude）；peerDependencies 写宿主兼容区间时须登记进 scripts/lib/catalog-peers-lib.ts 的 PEER_RANGE_ALLOWLIST 且逐字一致；补齐后重跑 pnpm contract')
     failed++
   }
   console.log(peers.problems.length > 0 ? `catalog-peers | ${peers.problems.length} 个失败` : 'catalog-peers | PASS')
@@ -180,8 +183,18 @@ console.log(failed === 0 ? '客户端契约：全部通过' : `客户端契约�
     failed++
   }
 }
-// export-surface-snapshot 闸已随 dsh-notifier 退役（单插件仓库无其快照输入面）；
-// 历史实现见 dsh-plugin-hub 仓库。
+// P1：导出面快照闸以**入口粒度**重建（本仓库两个入口：`.` 与 `./client`）——符号集 +
+// 声明块多重集；快照对文件搬移免疫、对定义改写敏感，是结构重构「零行为变更」的唯一
+// 机器证据。历史实现（包级 + 逐入口比对修复版）见 dsh-plugin-hub 仓库，本仓库按单包
+// 形态重写；执法点仍在本 contract 段，不新增 workflow。
+{
+  const surfaceGate = spawnSync(process.execPath, [join(ROOT, 'scripts/gate/export-surface-snapshot.mjs'), '--check'], { encoding: 'utf8' })
+  for (const line of (surfaceGate.stdout ?? '').split('\n')) if (line.trim() !== '') console.log(line)
+  if (surfaceGate.status !== 0) {
+    console.log(`export-surface-snapshot | FAIL exit=${surfaceGate.status}`)
+    failed++
+  }
+}
 // N2a（#733 M2c 后续）：模块级可变状态门禁——宪法第 1 条（状态收进闭包/实例）的机器判据。
 // 只对 dsh-notifier 生效（扫描面是门禁内的版本化常量；其它包存量未清零，见门禁自述）。
 // 该门禁的违规明细走 stderr（与 forbid-homedir-src 同款三态输出），故两路都回显。

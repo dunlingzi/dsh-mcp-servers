@@ -56,7 +56,8 @@ export default defineConfig({
       provider: 'istanbul',
       include: ['packages/*/src/**/*.{ts,tsx}', 'shared/**/*.js'],
       // client 源码的直连 src 测试（happy-dom project）尚未落地：现有 test/client/** 是
-      // 读 lib 产物的契约测试，不进覆盖率，其源文件在分母里恒为 0%（33 个文件、755 个函数）。
+      // 读 lib 产物的契约测试，不进覆盖率，其源文件在分母里恒为 0%（本仓库实测
+      // 12 个文件 / 1675 行；历史注释曾按 hub 时代 33 文件 / 755 函数记账）。
       // 计入分母会把全局值稀释到 59%，阈值失去约束力；且 happy-dom project 落地后分子跳升、
       // 必须二次基线化。待该 project 建立后移除本排除项并一次性重新基线化。
       exclude: ['**/*.d.ts', '**/client/**'],

@@ -23,7 +23,7 @@ import type { ServerConfig } from "../../types/interface.ts";
 import type { ToolDefinition, ToolOutputDefinition } from "@deepseek-ai/dsh-tools";
 import { MCPClient } from "./protocol.ts";
 import { defaultCallResultFallbackText, projectCallToolResult, withTimeout, msgOf, createRedactor, normalizeArguments } from "../../pipeline/interface.ts";
-import { resolveReconnect } from "../interface.ts";
+import { resolveReconnect } from "./reconnect.ts";
 import { createTransport } from "./transport.ts";
 import {
   CONNECT_TIMEOUT_MS,

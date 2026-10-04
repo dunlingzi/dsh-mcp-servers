@@ -12,6 +12,10 @@ on:
 
 permissions:
   contents: read
+  # changes 作业的 dorny/paths-filter 需要读 PR 文件列表；缺此项时该步骤报
+  # `Resource not accessible by integration`，repo-gate 随即 fail-closed → 每个 PR 必红。
+  # 仓库默认工作流令牌权限为 read（只读），故这里显式补一条最小读权限。
+  pull-requests: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

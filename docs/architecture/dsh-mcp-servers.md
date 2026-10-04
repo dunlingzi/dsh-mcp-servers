@@ -1,6 +1,7 @@
 # dsh-mcp-servers 架构与运行机制（图解）
 
-> 包：`@dunlingzi/dsh-mcp-servers` · 源码：`packages/dsh-mcp-servers/` · 版本：0.2.0
+> 包：`@dunlingzi/dsh-mcp-servers` · 源码：`packages/dsh-mcp-servers/` · 版本：以
+> [package.json](../../packages/dsh-mcp-servers/package.json) 为准（本文件不复制版本号，避免漂移）
 > 功能一句话：**DSH 的 MCP 服务器管理器**——管理 stdio / streamable-http 两种传输的
 > MCP 服务器，把已连接服务器的工具注册给模型，并提供三档中间层模式把项目级工具面
 > 收敛为四个原子工具（`ws_mcp_list` / `ws_mcp_detail` / `ws_mcp_search` / `ws_mcp_call`）。
@@ -33,7 +34,7 @@
 
 ## 2. 插件装配流程
 
-`apply(ctx)` 启动顺序（`src/apply.ts`）：
+`apply(ctx)` 启动顺序（`src/bootstrap/apply.ts`）：
 
 ```mermaid
 flowchart TD
@@ -202,6 +203,7 @@ sequenceDiagram
 | `/api/dsh-mcp-servers/session` | POST | 切换会话 cwd（`{cwd}`） |
 | `/api/dsh-mcp-servers/resume` | POST | 回前台受控重建当前工作空间连接 |
 | `/api/dsh-mcp-servers/servers/connect·disconnect·reconnect` | POST | 连接控制（`?name=&scope=&cwd=`） |
+| `/api/dsh-mcp-servers/servers/probe` | POST | 单次探活（连接一次即断，报告延迟与工具数） |
 | `/api/dsh-mcp-servers/import/json` | POST | 粘贴 mcpServers JSON 导入 |
 | `/api/dsh-mcp-servers/tool-disable` | PATCH | 工具级禁用（`{server, tool, disabled}`） |
 | `/api/dsh-mcp-servers/events` | GET | SSE 状态推送（30s 心跳） |

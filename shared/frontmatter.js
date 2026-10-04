@@ -1,5 +1,10 @@
 // dsh 插件家族共享层 — SKILL.md / 命令文件 frontmatter 轻量解析与改写（零依赖）。
 //
+// DEPRECATED（准入规则 7 两步走的第一步，P5 登记）：生产消费已全部退役——历史消费方
+// dsh-commands-files / dsh-skill-explorer 均不在本仓库内，仅测试仍引用。第二步
+// （移除本模块 + 清理消费方与随包发布的 `shared/frontmatter.d.ts` 副本）尚未执行；
+// 期间**保持导出面不变**，避免再次打断可能的外部消费方。
+//
 // 历史：dsh-commands-files 与 dsh-skill-explorer 各持一份同源复制（曾仅差 21 行
 // input 块支持，连文件头注释都未改），memory 又有第三份极简实现。
 // 统一由本模块提供；各插件的 lib/frontmatter.js 保留为薄封装以维持导出面稳定。

@@ -236,6 +236,12 @@ function main() {
     }
 
     // 磁盘 ↔ 派生一致性
+    // 行尾归一：生成物会入库，而 Windows 检出在 core.autocrlf=true 且无 .gitattributes 时
+    // 会把工作区的 LF 换成 CRLF，派生内容却是 LF——直接字符串比较会把「检出行为」误判成
+    // 「与拓扑不一致」。实测（2026-10-02）：CRLF 检出下 --check 必红，且 gate:pr 的 fail-fast
+    // 会连带跳过其后 6 步门禁（test:src-tests / gate:homedir / docs:check / lint / test:scripts）。
+    // 生成物语义与行尾无关，故比较前统一归一。
+    const normalizeEol = (text) => text.replace(/\r\n/g, '\n')
     const diskFiles = readdirSync(confDir).filter((f) => f.endsWith('.json')).sort()
     const derivedFileNames = [...derivedConfigs.keys()].sort()
     for (const f of derivedFileNames.filter((x) => !diskFiles.includes(x))) {
@@ -248,7 +254,7 @@ function main() {
     }
     for (const [file, expectedContent] of derivedConfigs.entries()) {
       const filePath = join(confDir, file)
-      if (existsSync(filePath) && readFileSync(filePath, 'utf8') !== expectedContent) {
+      if (existsSync(filePath) && normalizeEol(readFileSync(filePath, 'utf8')) !== normalizeEol(expectedContent)) {
         console.error(`[gen-stryker-conf] 配置文件内容与拓扑派生不一致: ${file} (请运行 pnpm stryker:gen 同步)`)
         hasError = true
       }
@@ -270,7 +276,7 @@ function main() {
     }
     for (const [file, expectedContent] of derivedVitestConfigs.entries()) {
       const filePath = join(repoRoot, file)
-      if (existsSync(filePath) && readFileSync(filePath, 'utf8') !== expectedContent) {
+      if (existsSync(filePath) && normalizeEol(readFileSync(filePath, 'utf8')) !== normalizeEol(expectedContent)) {
         console.error(`[gen-stryker-conf] vitest 测试面配置与拓扑派生不一致: ${file} (请运行 pnpm stryker:gen 同步)`)
         hasError = true
       }

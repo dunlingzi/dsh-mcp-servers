@@ -191,6 +191,79 @@ function checkAnchorRefs(): number {
   return refs
 }
 
+/**
+ * 路由表一致性（#P5 尾项）：包 README 声明的 HTTP 路由集合必须与源码 `ROUTES` 常量逐项一致。
+ *
+ * 动机（本仓库实测）：文档门禁此前只校验「相对链接 / 锚点 / pnpm 命令存在」，**没有任何
+ * 「文档声明的清单 == 源码常量」的判据**——架构文档的路由表因此长期缺 `servers/probe`，
+ * 头部版本号写成 0.2.0 而实现是 0.1.1。路由是插件的对外 ABI，属真实契约而非行文风格。
+ *
+ * 两侧事实源：`packages/<pkg>/src/api/routes.ts` 的 ROUTES 块（值面）与
+ * `packages/<pkg>/README.md` 的**表格行**（只认表格行，避免把正文里的 `*` 通配与 curl 示例算进来）。README 的
+ * `connect|disconnect|reconnect` 缩写形态按前缀展开后比对。任一侧解析为空即 fail-closed
+ * ——「零匹配」本身就是假绿向量。
+ */
+function extractRoutesFromSource(text: string): Set<string> {
+  const out = new Set<string>()
+  const block = /export const ROUTES\s*=\s*\{([\s\S]*?)\n\}/.exec(text)
+  if (block === null) return out
+  for (const m of block[1]!.matchAll(/:\s*"(\/api\/[^"]+)"/g)) out.add(m[1]!)
+  return out
+}
+
+/** 只取表格行里的路由字面量，并展开 `a|b|c` 缩写（前缀取自第一段）。 */
+function extractRoutesFromReadme(text: string): Set<string> {
+  const out = new Set<string>()
+  for (const line of text.split("\n")) {
+    if (!/^\s*\|/.test(line)) continue
+    for (const m of line.matchAll(/\/api\/dsh-mcp-servers\/[A-Za-z0-9_\-/|]+/g)) {
+      const raw = m[0]!.replace(/[|/]+$/, "")
+      if (raw === "" || raw.endsWith("/")) continue
+      if (!raw.includes("|")) {
+        out.add(raw)
+        continue
+      }
+      const parts = raw.split("|")
+      const base = parts[0]!.slice(0, parts[0]!.lastIndexOf("/") + 1)
+      for (const p of parts) out.add(p === parts[0] ? p : base + p)
+    }
+  }
+  return out
+}
+
+/** 逐包比对路由表；返回覆盖情况供自述打印（判据与实现同源）。 */
+function checkRouteTables(): { packages: number; routes: number } {
+  let packages = 0
+  let routes = 0
+  const pkgRoot = join(AGENT_ROOT, "packages")
+  if (!existsSync(pkgRoot)) return { packages, routes }
+  for (const entry of readdirSync(pkgRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !entry.name.startsWith("dsh-")) continue
+    const routesFile = join(pkgRoot, entry.name, "src/api/routes.ts")
+    const readme = join(pkgRoot, entry.name, "README.md")
+    if (!existsSync(routesFile) || !existsSync(readme)) continue
+    packages++
+    const declared = extractRoutesFromSource(readFileSync(routesFile, "utf8"))
+    const documented = extractRoutesFromReadme(readFileSync(readme, "utf8"))
+    if (declared.size === 0) {
+      failures.push(`${entry.name}: ROUTES 解析为空 —— 判据输入缺失（fail-closed）`)
+      continue
+    }
+    if (documented.size === 0) {
+      failures.push(`${entry.name}: README 路由表解析为空 —— 判据输入缺失（fail-closed）`)
+      continue
+    }
+    routes = declared.size
+    for (const r of declared) {
+      if (!documented.has(r)) failures.push(`${entry.name}: README 路由表缺 ${r}（源码 ROUTES 有此项）`)
+    }
+    for (const r of documented) {
+      if (!declared.has(r)) failures.push(`${entry.name}: README 路由表多 ${r}（源码 ROUTES 无此项）`)
+    }
+  }
+  return { packages, routes }
+}
+
 function checkPkg(pkgDir: string): string | undefined {
   const name = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8')).name
   const readme = join(pkgDir, 'README.md')
@@ -243,9 +316,11 @@ if (existsSync(rootEn)) {
 const agentDocs = checkAgentDocs()
 checkAgentCommands()
 checkAnchorRefs()
+const routeFace = checkRouteTables()
 
 const ok = failures.length === 0
 console.log(`verify-docs：检查 ${checked} 个包 + 根 README + ${agentDocs} 个 agent 规则文档`)
+console.log(`路由表一致性：${routeFace.packages} 个包 / ${routeFace.routes} 条路由（README 声明 == 源码 ROUTES）`)
 if (!ok) { for (const f of failures) console.error(`  ✘ ${f}`) }
 console.log(ok ? '文档一致性：通过' : `文档一致性：${failures.length} 个问题`)
 process.exit(ok ? 0 : 1)

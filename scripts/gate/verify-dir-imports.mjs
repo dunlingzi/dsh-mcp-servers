@@ -510,7 +510,16 @@ function analyzePackage(pkgName, topology) {
     uncoveredSrcFiles.sort()
   }
 
-  const valueCount = raLegacy.filter((r) => !r.isType).length
+  // raLegacy 按「源模块 → 目标模块」**去重**计数（值 / type 各自去重后相加）。
+  // 本计数器的语义是「impl 跨域依赖的存量」，同族的 leafValueEdges / crossModuleRefs 亦按
+  // 模块对计数；按「每条引用」计数会让**任何文件拆分**凭空抬高存量（新文件把同一批 import
+  // 复制一份）→ 把结构分解误判成回归（实测：P3 增量 1 拆出两个同域实现文件后 86 → 95，
+  // +9 = 新文件的跨域 import 语句数，而模块级依赖图完全未变）。去重后：文件拆分中性、
+  // 新增真实跨模块依赖仍 +1、移除依赖仍 −1；`raLegacy` 数组本身保留，供 --zones 打逐条明细。
+  const raLegacyPairs = (typeOnly) =>
+    new Set(raLegacy.filter((r) => Boolean(r.isType) === typeOnly).map((r) => `${r.fromModule}→${r.toModule}`)).size
+  const raLegacyValue = raLegacyPairs(false)
+  const raLegacyType = raLegacyPairs(true)
   return {
     package: pkgName,
     srcDir,
@@ -541,9 +550,9 @@ function analyzePackage(pkgName, topology) {
       fileValueEdges: edgeCount(fileValueEdges),
       fileCycles: fileCycles.size,
       crossModuleRefs: refs.filter(crossModule).length,
-      raLegacy: raLegacy.length,
-      raLegacyValue: valueCount,
-      raLegacyType: raLegacy.length - valueCount,
+      raLegacy: raLegacyValue + raLegacyType,
+      raLegacyValue,
+      raLegacyType,
       implToOtherImpl: raImpl.length,
       missingInterface: missingInterface.length,
       directImpl: directImpl.length,
@@ -562,8 +571,11 @@ function analyzePackage(pkgName, topology) {
  * **不得**自动放宽它们（保持旧基线值），否则「每次结构 PR 顺手放宽质量计数」会让
  * 单调基线退化为「每次放宽」（#690 B1 的原始病灶）。
  *   - leafModuleCycles / fileCycles：值环（M1 目标 0）
- *   - raLegacy*：`<域>/<impl>.ts` 直接引用他域文件的存量（ARCHITECTURE-METHOD §2
- *     载体依赖表：impl 只允许依赖本目录内 + 本域 deps.ts，跨域须经 deps.ts 声明）
+ *   - raLegacy*：`<域>/<impl>.ts` 跨域依赖的存量，**按「源模块 → 目标模块」去重计数**
+ *     （值 / type 各自去重后相加）。口径与 leafValueEdges / crossModuleRefs 一致：文件
+ *     拆分中性（同一模块对的多条引用只计 1），新增真实跨模块依赖仍 +1。语义依据见
+ *     ARCHITECTURE-METHOD §2 载体依赖表（impl 只允许依赖本目录内 + 本域 deps.ts，
+ *     跨域须经 deps.ts 声明）
  *   - implToOtherImpl：impl 直引他域**实现文件**（D-2 新口径，目标 0）
  *   - missingInterface / directImpl：规则违例存量
  *
@@ -690,6 +702,7 @@ function renderZones(analysis) {
   lines.push(
     `R-A 语义切换前（impl → 他域任意文件，旧口径）：${metrics.raLegacy} 条（值 ${metrics.raLegacyValue} / type ${metrics.raLegacyType}）`,
   )
+  lines.push('  逐条引用明细（同一模块对可有多条；上面的条数已按模块对去重）')
   for (const r of raLegacy) {
     lines.push(`  ${rel(srcDir, r.fromFile)} → ${rel(srcDir, r.target)} [${r.isType ? 'type' : 'value'}]`)
   }
