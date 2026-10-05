@@ -604,6 +604,21 @@ it("client 会话绑定常驻（apply 级 POST /session，独立于设置页是�
   expect(clientSrc.includes("/api/dsh-mcp-servers/session"), "POST /session 进产物").toBeTruthy();
   expect(clientSrc.includes("createSharedSessionState"), "共享会话状态（页面复用 cwd）进产物").toBeTruthy();
 });
+it("client 新建请求的会话 cwd 只走 query（issue #7 契约：body.cwd 是服务器工作目录）", () => {
+  const clientSrc = readFileSync(new URL("../../lib/client.js", import.meta.url), "utf8");
+  // 客户端是 POST /servers 的唯一调用方：它的请求形态就是这条契约的事实源。
+  // 新建 URL 必须经 withCwd 带上 ?cwd=（服务端只从 query 读会话），而 body 里的 cwd 是
+  // 表单填的服务器工作目录（stdio 子进程 cwd），两者同名不同义、互不覆盖。
+  expect(clientSrc.includes("withCwd(API.servers"), "新建 URL 经 withCwd 带 ?cwd=（会话 cwd 的唯一通道）").toBeTruthy();
+  // 项目级新建前先 await 一次会话重绑：把「宿主需已有活跃会话」这条时序依赖显式化
+  // （apply 级 bindSession 的 POST /session 是 fire-and-forget，见 core/session.ts）。
+  // 断言取**判别性**字符串：只写 `rebindSession` 会假绿——该函数定义在 core/session.ts，
+  // 其函数体本身就会被打进产物（对照实验：撤掉客户端改动后 `rebindSession` 仍为 True）。
+  expect(
+    clientSrc.includes('targetScope === "project" && hasSessionCwd'),
+    "项目级新建前置重绑（且仅在确有会话 cwd 时）进产物",
+  ).toBeTruthy();
+});
 it("client 设置页 REST 面与 SSE（probe / CRUD / EventSource + watchdog）", () => {
   const clientSrc = readFileSync(new URL("../../lib/client.js", import.meta.url), "utf8");
   expect(clientSrc.includes("/api/dsh-mcp-servers/servers/probe"), "单次探活 API 进产物").toBeTruthy();
@@ -1678,6 +1693,49 @@ describe("路由（makeRoutes / events / health / tool-disable / resume）", () 
     );
     expect(res.state.status).toBe(201);
     expect(managerState.lastScope).toBe("project");
+  });
+
+  // ------------------------------------------------ issue #7：POST /servers 的 cwd 双语义
+  //
+  // body 的 cwd 是**服务器工作目录**（stdio 子进程 cwd），query 的 cwd 才是**会话 cwd**。
+  // 历史缺陷：POST 分支曾从 body 读会话 cwd，于是「新建时填工作目录」会静默切换当前会话的
+  // projectRoot（下面第一条用例就是它的回归断言）。第二条用例覆盖「query 能切会话」这条
+  // 正常路径——它是客户端实际使用的通道，也是本次把会话来源统一到 query 后的接线证明。
+  it("POST servers 带 body.cwd 不改会话 cwd（#7 回归：body.cwd 是服务器工作目录）", async () => {
+    await find(ROUTES.session).handler(fakeReq("POST", ROUTES.session, { cwd: "C:/sess-a" }), fakeRes());
+    expect(managerState.sessionCwd).toBe("C:/sess-a");
+    const res = fakeRes();
+    await find(ROUTES.servers).handler(
+      fakeReq("POST", ROUTES.servers, { name: "srv-body-cwd", transport: "stdio", command: "echo", cwd: "C:/server-dir" }),
+      res,
+    );
+    expect(res.state.status).toBe(201);
+    expect(managerState.sessionCwd, "body.cwd 不得被当成会话 cwd（#7）").toBe("C:/sess-a");
+  });
+
+  it("POST servers?cwd= 能切会话（会话 cwd 只走 query，与 PATCH / DELETE 一致）", async () => {
+    const res = fakeRes();
+    await find(ROUTES.servers).handler(
+      fakeReq("POST", `${ROUTES.servers}?cwd=C:/sess-b`, { name: "srv-q-cwd", transport: "stdio", command: "echo" }),
+      res,
+    );
+    expect(res.state.status).toBe(201);
+    expect(managerState.sessionCwd, "query cwd 应触发会话切换").toBe("C:/sess-b");
+  });
+
+  it("POST servers 的 body.cwd 仍透传为服务器 cwd（#7：删会话读取不得误伤子进程 cwd）", async () => {
+    const res = fakeRes();
+    await find(ROUTES.servers).handler(
+      fakeReq("POST", ROUTES.servers, {
+        name: "srv-subproc-cwd",
+        transport: "stdio",
+        command: "echo",
+        cwd: "C:/subproc-dir",
+      }),
+      res,
+    );
+    expect(res.state.status).toBe(201);
+    expect(store.find("srv-subproc-cwd").cwd, "body.cwd 应落到 server.cwd").toBe("C:/subproc-dir");
   });
 
   it("DELETE ?scope=project 透传 scope", async () => {

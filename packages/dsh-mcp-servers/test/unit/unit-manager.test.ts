@@ -122,6 +122,15 @@ describe("McpServers.add", () => {
     await manager.add({ name: "proj-srv", transport: "stdio", command: "echo" }, SCOPE_PROJECT);
     expect(projStore.find("proj-srv").name).toBe("proj-srv");
   });
+  it("project scope 无活跃会话时抛错（issue #7 的前置：会话必须先建立）", async () => {
+    // 这条守卫是 #7 的隐藏依赖：POST /servers 的会话来源改成 query 后，「无活跃会话 +
+    // scope=project」会落到这里抛错（路由层 handleError 落成 400）。守卫在 manager 层，
+    // 不在路由层——smoke 的 manager stub 没有该语义，故断言放在真实类上。
+    const { manager } = fixture();
+    await expect(
+      manager.add({ name: "proj-no-session", transport: "stdio", command: "echo" }, SCOPE_PROJECT),
+    ).rejects.toThrow(/no active project session/);
+  });
 });
 
 describe("McpServers.update", () => {

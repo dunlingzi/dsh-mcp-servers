@@ -112,12 +112,12 @@ when the session has no project cwd).
 | Route | Purpose |
 | --- | --- |
 | `/api/dsh-mcp-servers/health` | health check |
-| `/api/dsh-mcp-servers/servers` | server CRUD (GET snapshot / POST add / PATCH update / DELETE) |
+| `/api/dsh-mcp-servers/servers` | server CRUD (GET snapshot / POST add / PATCH update / DELETE); the session cwd travels in the `?cwd=` query parameter, while the body `cwd` is the server working directory (stdio child cwd) — same name, different meaning |
 | `/api/dsh-mcp-servers/servers/connect|disconnect|reconnect` | connection control |
 | `/api/dsh-mcp-servers/servers/probe` | one-shot probe (latency + tool count) |
 | `/api/dsh-mcp-servers/config` | middleware mode read (GET) / hot-switch (POST) |
 | `/api/dsh-mcp-servers/import/json` | paste mcpServers JSON import |
-| `/api/dsh-mcp-servers/session` | session switch (project MCP follows session cwd) |
+| `/api/dsh-mcp-servers/session` | session switch (project MCP follows session cwd); the only entry point that can explicitly switch or clear the project scope |
 | `/api/dsh-mcp-servers/resume` | controlled rebuild of current workspace connections |
 | `/api/dsh-mcp-servers/tool-disable` | per-tool disable switch (PATCH) |
 | `/api/dsh-mcp-servers/events` | SSE status push (30s heartbeat + watchdog self-healing) |
@@ -161,6 +161,11 @@ await ctx.mcpServers.registerServer({
   the explicit env
 - **Workspace isolation**: routing keyed by session cwd; full-name consistency
   checks prevent cross-workspace leakage; policy guard (allowTools/denyTools, deny wins)
+- **The session cwd travels only in the query parameter**: every route reads it from
+  `?cwd=` and **never from the request body**; a body `cwd` is merely the server working
+  directory (stdio child cwd). Same name, different meaning — write routes treat an empty
+  value as a no-op and never clear the project scope; switching or clearing it is reserved
+  for `POST /session`
 - **Per-tool disable** is enforced consistently across `ws_mcp_call`, the
   pre-execute guard for direct `mcp__` tools, and declared discipline tools;
   records persist in `<DSH_HOME>/dsh-mcp-user-state.json`
