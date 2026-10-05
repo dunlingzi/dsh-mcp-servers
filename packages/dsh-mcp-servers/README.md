@@ -116,12 +116,12 @@ npx @deepseek-ai/dsh plugin --profile web update @dunlingzi/dsh-mcp-servers
 | 路由 | 说明 |
 | --- | --- |
 | `/api/dsh-mcp-servers/health` | 健康检查 |
-| `/api/dsh-mcp-servers/servers` | 服务器 CRUD（GET 快照 / POST 新增 / PATCH 更新 / DELETE 删除） |
+| `/api/dsh-mcp-servers/servers` | 服务器 CRUD（GET 快照 / POST 新增 / PATCH 更新 / DELETE 删除）；会话 cwd 走 `?cwd=` 查询参数，body 的 `cwd` 是服务器工作目录（stdio 子进程 cwd），两者同名不同义 |
 | `/api/dsh-mcp-servers/servers/connect|disconnect|reconnect` | 连接控制 |
 | `/api/dsh-mcp-servers/servers/probe` | 单次探活（连接一次即断，报延迟与工具数） |
 | `/api/dsh-mcp-servers/config` | 中间层模式读取（GET）/ 热切换（POST） |
 | `/api/dsh-mcp-servers/import/json` | 粘贴 mcpServers JSON 导入 |
-| `/api/dsh-mcp-servers/session` | 会话切换（跟随会话的项目级 MCP） |
+| `/api/dsh-mcp-servers/session` | 会话切换（跟随会话的项目级 MCP）；唯一可显式切换 / 清空项目级的入口 |
 | `/api/dsh-mcp-servers/resume` | 回前台受控重建当前工作空间连接 |
 | `/api/dsh-mcp-servers/tool-disable` | 工具级禁用开关（PATCH） |
 | `/api/dsh-mcp-servers/events` | SSE 状态推送（30s 心跳 + watchdog 自愈） |
@@ -167,6 +167,10 @@ await ctx.mcpServers.registerServer({
 - **工作空间隔离（中间层）**：路由以调用方会话当前 cwd 为唯一输入；server
   全名一致性校验（参数声明的 root ≠ 路由 root → 拒绝）防跨空间串台；
   策略 guard（allowTools/denyTools，deny 优先）按 `@<root>/<server>` 全名或裸名配置
+- **会话 cwd 只走 query 参数**：所有路由的会话 cwd 唯一来源是 `?cwd=` 查询参数，
+  **不从请求体读取**；请求体里的 `cwd` 只是服务器工作目录（stdio 子进程 cwd）。
+  两者同名不同义——写面（新建/编辑/删除/连接控制）收到空串一律视为 no-op，
+  **不**清空项目级；显式切换或清空项目级只走 `POST /session`
 - **中间层工具只读边界**：`ws_mcp_list` / `ws_mcp_detail` / `ws_mcp_search` 纯读
   本地目录缓存（不触达远端服务器、不执行工具），不经过策略 guard；`ws_mcp_call`
   是唯一执行远端工具并受策略约束（deny 优先）的入口

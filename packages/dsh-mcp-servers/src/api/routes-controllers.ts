@@ -146,7 +146,12 @@ export function buildServersRoute(manager: RoutesManager, helpers: RouteHelpers)
         try {
           const rec = body as Record<string, unknown>;
           const scope = normalizeScope(rec.scope as string);
-          if (typeof rec.cwd === "string" && rec.cwd !== "") await manager.setSession(rec.cwd);
+          // 会话 cwd 只从 query 取（与 PATCH / DELETE 及其余写面一致）；body 的 cwd 是
+          // **服务器工作目录**（stdio 子进程 cwd），不承载会话语义（issue #7）。
+          // 历史缺陷：此处曾 `setSession(rec.cwd)`，于是「新建时填工作目录」会静默切换
+          // 当前会话的 projectRoot。空串语义：写面不收「用空串清会话」（清会话走
+          // POST /session），与 maybeSession 的既有实现一致。
+          await helpers.maybeSession(url);
           const server = await manager.add(rec, scope);
           writeJson(res, 201, { server, summary: manager.summary() });
         } catch (error) {

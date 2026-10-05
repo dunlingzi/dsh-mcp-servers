@@ -16,6 +16,7 @@
 import * as React from "react";
 import { api, cwdQueryOf, withCwd, toolDisableServerKey } from "../core/api.ts";
 import { API } from "../core/constants.ts";
+import { rebindSession } from "../core/session.ts";
 import {
   splitArgs,
   formatArgs,
@@ -253,14 +254,33 @@ export function EditView(props: EditViewProps): any {
   const saveWith = (payload: Record<string, unknown>, create?: { name: string; scope: string }): void => {
     setBusy(true);
     setErrorText("");
-    const request = isEdit
-      ? api(`${API.servers}${scopeQuery}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) })
-      : api(withCwd(API.servers, shared.currentCwd), {
+    if (isEdit) {
+      api(`${API.servers}${scopeQuery}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) })
+        .then(() => onSaved())
+        .catch((e: any) => setErrorText(t("saveFail", { msg: String(e?.message ?? e) })))
+        .finally(() => setBusy(false));
+      return;
+    }
+    const targetScope = create?.scope ?? scope;
+    // issue #7：会话 cwd 由宿主从 `?cwd=` 读取，而 apply 级 bindSession 的 POST /session 是
+    // fire-and-forget（core/session.ts）——项目级新建需要宿主侧已有活跃会话，否则
+    // projectStoreOrThrow 会 400。故项目级新建前先 await 一次重绑（宿主 setSession 幂等短路，
+    // 正常时零副作用），把这条时序依赖显式化，而不是依赖「请求恰好先到」。
+    //
+    // 仅在**确有会话 cwd** 时重绑：rebindSession 对空 cwd 会发 `{cwd:""}`，那在宿主侧是
+    // 「清空项目级」——「新建」这个动作不该顺带清会话。无 cwd 时跳过重绑，请求照发
+    // （项目级会由宿主按既有守卫报「无活跃项目会话」）。
+    const hasSessionCwd = typeof shared.currentCwd === "string" && shared.currentCwd !== "";
+    const rebind = targetScope === "project" && hasSessionCwd ? rebindSession(shared) : Promise.resolve();
+    rebind
+      .catch(() => {})
+      .then(() =>
+        api(withCwd(API.servers, shared.currentCwd), {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ...payload, name: create?.name ?? name.trim(), scope: create?.scope ?? scope }),
-        });
-    request
+          body: JSON.stringify({ ...payload, name: create?.name ?? name.trim(), scope: targetScope }),
+        }),
+      )
       .then(() => onSaved())
       .catch((e: any) => setErrorText(t("saveFail", { msg: String(e?.message ?? e) })))
       .finally(() => setBusy(false));
