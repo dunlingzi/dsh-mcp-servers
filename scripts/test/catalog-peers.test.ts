@@ -10,10 +10,10 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { checkCatalogPeers, parseCatalog, parseReleaseExclude } from '../lib/catalog-peers-lib.ts'
+import { DSH_HOST_WINDOW, checkCatalogPeers, parseCatalog, parseReleaseExclude } from '../lib/catalog-peers-lib.ts'
 
 const ROOT = join(import.meta.dirname, '..', '..')
 
@@ -32,6 +32,29 @@ test('真实仓库：宿主兼容区间 peer 全部命中豁免登记且逐字�
   // 新宿主）。数量与命中数绑定——漏登记 / 登记值漂移都会让 problems 非空或此处不等。
   const { peerRangeCount } = checkCatalogPeers(ROOT)
   assert.equal(peerRangeCount, 5, `应有 5 个 peer 命中区间豁免，实际 ${peerRangeCount}`)
+})
+
+test('真实仓库：宿主兼容窗口必须是向上累积形态（P0 尾项回归）', () => {
+  // 逐代枚举（`0.1.5-rc.2 || ^0.1.6-alpha.1 || 0.2.0-rc.2`）是已被淘汰的形态：实测它对
+  // 已发布的 0.1.5-rc.3 / 0.2.0-rc.1 / 0.2.1-alpha.1 / 0.2.1-rc.1 一律 REFUSED，宿主一
+  // 升级该 bundle 就被静默跳过。此处锁死「必须累积」，防止改回枚举而门禁全绿。
+  const pkg = JSON.parse(readFileSync(join(ROOT, 'packages', 'dsh-mcp-servers', 'package.json'), 'utf8'))
+  for (const [name, range] of Object.entries(pkg.peerDependencies ?? {})) {
+    if (!name.startsWith('@deepseek-ai/dsh-')) continue
+    assert.match(range, /^>=/, `peer ${name} 必须写成向上累积区间（>=<floor>），实际 "${range}"`)
+  }
+})
+
+test('真实仓库：累积窗口覆盖已发布宿主（含 0.2.1-alpha.1），枚举窗口覆盖不到', () => {
+  // 形态的机器判据（零新增依赖，不引 semver——区间语义的实测证据在 PR：用宿主自己的
+  // evaluatePluginCompatibility 逐版本复验）。枚举形态只认三个字面量，已发布的
+  // 0.1.5-rc.3 / 0.2.0-rc.1 / 0.2.1-alpha.1 / 0.2.1-rc.1 全不在其中，故宿主一升级即失配。
+  const cumulative = '>=0.1.5-rc.2'
+  assert.equal(DSH_HOST_WINDOW, cumulative, `DSH_HOST_WINDOW 应为累积形态，实际 "${DSH_HOST_WINDOW}"`)
+  const retired = ['0.1.5-rc.2', '^0.1.6-alpha.1', '0.2.0-rc.2']
+  for (const host of ['0.1.5-rc.3', '0.2.0-rc.1', '0.2.1-alpha.1', '0.2.1-rc.1']) {
+    assert.ok(!retired.includes(host), `${host} 不在已淘汰的枚举窗口里（故枚举形态下必失配）`)
+  }
 })
 
 test('parseCatalog：只取 catalog 段，不被后续顶层段污染', () => {

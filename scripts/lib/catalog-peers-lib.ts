@@ -26,9 +26,9 @@ import { join } from 'node:path'
 const OFFICIAL_SCOPE = '@deepseek-ai/'
 const DEP_FIELDS = ['peerDependencies', 'devDependencies', 'dependencies']
 
-/** dsh 系宿主兼容窗口：逐代登记已发布宿主（commit 6a66f75 / 0da41cf）。 */
-const DSH_HOST_WINDOW = '0.1.5-rc.2 || ^0.1.6-alpha.1 || 0.2.0-rc.2'
-const DSH_HOST_WINDOW_REASON = '宿主兼容窗口：逐代登记已发布宿主；宿主发布新一代 rc 时须在此扩窗'
+/** dsh 系宿主兼容窗口（P0 尾项裁决）：**向上累积**形态，floor = 已实机验证的最低宿主。 */
+export const DSH_HOST_WINDOW = '>=0.1.5-rc.2'
+const DSH_HOST_WINDOW_REASON = '宿主兼容窗口：向上累积区间（floor = 0.1.5-rc.2，已实机验证的最低宿主）；宿主发布新里程碑或有破坏性 API 变更时重评 floor'
 
 /**
  * peer 区间豁免登记（唯一事实源）：key = `<包目录>|<官方包名>`，value = 登记的区间
@@ -40,8 +40,12 @@ const DSH_HOST_WINDOW_REASON = '宿主兼容窗口：逐代登记已发布宿主
  *  - 登记项在本仓库不存在 → 判红（peer 已删或已改回 catalog: 时必须删除登记，
  *    否则条目腐化成死声明）。
  *
- * 维护要求：区间应写成**向上累积**形态（如 `>=0.1.5-rc.2`）以求覆盖后续宿主；
- * 逐代枚举（当前形态）在宿主发布新一代 rc 时直接失配 → 该 bundle 被宿主跳过。
+ * 维护要求（P0 尾项，2026-10-04 裁决）：区间一律写**向上累积**形态（floor = 已实机
+ * 验证的最低宿主，当前 `>=0.1.5-rc.2`）。逐代枚举（`0.1.5-rc.2 || ^0.1.6-alpha.1 ||
+ * 0.2.0-rc.2`）是**已被淘汰的形态**——实测该形态对已发布的 `0.1.5-rc.3` / `0.2.0-rc.1`
+ * / `0.2.1-alpha.1` / `0.2.1-rc.1` 一律 REFUSED，宿主升级时该 bundle 会被静默跳过并从
+ * profile bundles 写掉。累积形态对已知宿主全部放行；代价是区间内的**未实测宿主**不保证
+ * 运行时 API 兼容，故宿主发布新里程碑或有破坏性 API 变更时须重评 floor 并实机验证。
  */
 export const PEER_RANGE_ALLOWLIST = new Map([
   ['dsh-mcp-servers|@deepseek-ai/cordis', {
