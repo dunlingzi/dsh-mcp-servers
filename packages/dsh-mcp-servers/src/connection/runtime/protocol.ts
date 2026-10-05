@@ -40,7 +40,7 @@ export class MCPClient {
    * notifications/initialized（替代自写版的硬编码 protocolVersion 2025-03-26）。
    */
   async initialize(): Promise<unknown> {
-    const client = new Client({ name: "dsh-mcp-servers", version: "0.1.1" }, { capabilities: {} });
+    const client = new Client({ name: "dsh-mcp-servers", version: "0.1.2" }, { capabilities: {} });
     try {
       await client.connect(this.transport.sdk);
     } catch (error) {

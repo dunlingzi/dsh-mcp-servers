@@ -1,9 +1,9 @@
 name: Release
 
 # Tag-triggered publish：推 vX.Y.Z tag 是唯一发布开关。
-# 校验每个包版本 == tag 版本（tag 是版本唯一来源）→ 全量门禁 →
-# 按依赖序 pnpm publish（7 子包 → 聚合包）→ 生成 GitHub Release。
-# 需要仓库 secret NPM_TOKEN（@wingsky scope 的 npm automation token）。
+# 校验包版本 == tag 版本（tag 是版本唯一来源）→ 全量门禁 →
+# pnpm publish（本仓为单插件仓库：唯一发布物 @dunlingzi/dsh-mcp-servers）→ 生成 GitHub Release。
+# 需要仓库 secret NPM_TOKEN（@dunlingzi scope 的 npm automation token）。
 
 on:
   push:
@@ -42,8 +42,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify versions（全包版本 == tag）
+      - name: Verify versions（包版本 == tag）
         run: node scripts/release/verify-version.ts
+
+      # fail-closed：release notes 缺失时，下面的「Create GitHub Release」会静默回退
+      # GitHub 自动 notes——本仓约定「每版入库 docs/release-notes/vX.Y.Z.md」，故在
+      # 发布前就把缺件暴露出来（tag 推送不可逆，失败要发生在 publish 之前）。
+      - name: Verify release notes（fail-closed，缺失即中止）
+        run: |
+          f="docs/release-notes/${{ github.ref_name }}.md"
+          if [ ! -f "$f" ]; then
+            echo "::error::$f 缺失——按 .dsh/skills/dsh-plugin-release 约定，每版须入库 docs/release-notes/<tag>.md（缺失会被 GitHub 自动 notes 静默替代）"
+            exit 1
+          fi
+          echo "release notes 就位：$f"
 
       - name: Build
         run: pnpm build
@@ -57,7 +69,7 @@ jobs:
       - name: Pack check
         run: pnpm pack:check
 
-      - name: Publish to npm（pnpm，依赖序，幂等：版本已存在自动跳过）
+      - name: Publish to npm（幂等：版本已存在自动跳过）
         run: |
           set -e
           if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
