@@ -40,6 +40,34 @@ worktree 建在仓库外的独立路径（分支名 `/` → `-`），不建在�
 构建、提交、测试、验证都在 worktree 内完成。
 浏览器实测用独立 profile + 独立端口（临时 `DSH_HOME`）——**不得改用户 profile 代装**。
 
+⚠️ **`git worktree remove` 只清注册表，磁盘残留要单独清**（2026-10-05 实测）：
+它返回 exit=0、`git worktree list` 也只剩主仓，但 **worktree 目录仍在磁盘上**，里面是 pnpm 的
+junction 农场（实测 3 个 worktree 各 **1376 个 junction** + 725 个空目录、**0 个实体文件**）。
+**绝不能直接 `Remove-Item -Recurse` / `fs.rmSync(recursive)`** —— 对含 junction 的树递归删除会
+**连 junction 的目标内容一起删**（`~/.dsh/AGENTS.md` 记的 2026-09-29 事故即此类，毁掉 1,391 个文件）。
+正确顺序：
+
+```sh
+# 1) 先数 reparse point，并抽查 junction 的 Target：
+#    目标落在该 worktree 自己内部（node_modules/.pnpm/...）且已失联 = dangling，删除不波及活内容
+# 2) 用 link-safe-rm（先只删链接、再删实体），务必先 --dry-run
+node 'C:/Users/19125/_archive/.dsh/2026-09/2026-09-29_dsh-020rc1-compat/02_脚本/link-safe-rm.cjs' '<worktree 路径>' --dry-run
+node 'C:/Users/19125/_archive/.dsh/2026-09/2026-09-29_dsh-020rc1-compat/02_脚本/link-safe-rm.cjs' '<worktree 路径>'
+# 3) 复核主仓 node_modules 文件数前后不变（本次实测 26,959 → 26,959）
+```
+
+⚠️ **推本仓必须显式带代理**：本机直连 `github.com:443` 会 TIMEOUT，而 `~/.gitconfig` 里的
+`[https] proxy` 是 git **不认的键**（键名应为 `http.proxy`，详见 `~/.dsh/AGENTS.md` 同名小节）。
+本仓推送一律写成：
+
+```sh
+git -c http.proxy=http://127.0.0.1:7897 push origin <ref>
+```
+
+⚠️ **合并 PR 后要手动删分支**：本仓未开 GitHub 的「自动删除 head 分支」，
+远端 `task/*` 在 PR 合并后仍会留着，需 `git push origin --delete <branch>` + `git fetch --prune`
+（本地对应分支用 `git branch -d`）。
+
 ## 任务与流程
 
 - **任务来自 issue**：无人值守 / 自治循环场景，改动前先在 issue 内认领或创建 issue 并让
