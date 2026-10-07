@@ -13,6 +13,7 @@ export default defineConfig({
       'packages/dsh-mcp-servers/test/unit/unit-catalog.test.ts',
       'packages/dsh-mcp-servers/test/unit/unit-client-core.test.ts',
       'packages/dsh-mcp-servers/test/unit/unit-hotspot.test.ts',
+      'packages/dsh-mcp-servers/test/unit/unit-inject-tools.test.ts',
       'packages/dsh-mcp-servers/test/unit/unit-manager.test.ts',
       'packages/dsh-mcp-servers/test/unit/unit-manager2.test.ts',
       'packages/dsh-mcp-servers/test/unit/unit-middleware.test.ts',
