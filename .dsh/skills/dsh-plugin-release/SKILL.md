@@ -68,3 +68,38 @@ description: >
   基线唯一事实源是 `pnpm-workspace.yaml` catalog。
 - 失败回退：Release 未生成时不要重推同 tag，先查 release.yml 日志；已发布的 npm 版本
   不可撤回，用 `scripts/release/publish-if-missing.ts` 的幂等语义重新执行管线。
+
+## 5. NPM_TOKEN 补发（tag 已推、npm 未发布时）
+
+`release.yml` 的 `Check npm token` 步骤在 `NPM_TOKEN` 缺失时**跳过** npm 发布并在 run 里留
+notice；tag 版本校验、全量门禁、GitHub Release 三步照常完成。此时包处于「已发布 tag、
+未发布 npm」形态——**不要重推 tag**，按下面顺序补发：
+
+1. **配置 secret（维护者，一次性）**：npm 生成 @dunlingzi scope 的 automation token
+   （Access Tokens → Generate New Token → Automation），写入仓库
+   Settings → Secrets and variables → Actions → New repository secret，名称必须为 `NPM_TOKEN`。
+2. **确认版本与 tag 一致**：`packages/dsh-mcp-servers/package.json` 的 `version` 必须等于
+   tag 去掉 `v`（`Verify versions` 步骤会再校验一次，不一致在 publish 之前即中止）。
+3. **重跑同一 tag 的 run（幂等，不新增 tag）**：
+
+   ```sh
+   gh run list --workflow=release.yml --limit 10   # 找该 tag 的 run id
+   gh run rerun <run-id>                           # 完整校验 + 门禁 + publish + Release
+   ```
+
+   `release.yml` 只监听 `tag push`、没有 `workflow_dispatch`，故只能 rerun 既有 run，
+   不能用 `gh workflow run`。secrets 在 run 执行时解析，补配后再 rerun 即生效。
+4. **核对发布结果**（本机默认 registry 是镜像，必须显式带 `--registry`，否则可能读到滞后结果）：
+
+   ```sh
+   npm view @dunlingzi/dsh-mcp-servers version --registry=https://registry.npmjs.org
+   npm view @dunlingzi/dsh-mcp-servers versions --registry=https://registry.npmjs.org
+   ```
+
+5. **幂等语义**：`scripts/release/publish-if-missing.ts` 逐包 `npm view <pkg>@<ver>`——已存在
+   即跳过（stderr 记 `已存在，跳过: <pkg>@<ver>`），只把缺失的包名打到 stdout 交给
+   `pnpm --filter <pkg> publish`。故 rerun 与重复触发都安全。**绝不 `npm unpublish`**
+   （会打断已安装方的解析）；发错了只能 `npm deprecate` 并在下一版修正。
+6. **刷新 Release body**：补发后把 `docs/release-notes/<tag>.md` 头部的「发布的形态」段
+   （若之前标了「不含 npm 发布」）改写为已发布；rerun 时 `Create GitHub Release` 步骤会对
+   同一 tag 的 Release 执行更新，body 取该文件。
