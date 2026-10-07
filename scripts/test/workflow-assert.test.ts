@@ -186,6 +186,22 @@ test('ci.yml/observe*/baseline-overlay/release/health-report.yml: 第三方与�
   }
 })
 
+test('release.yml: npm 发布由 token 存在性 gate 控制，缺 token 不得硬失败（tag → Release 不依赖 npm 凭据）', () => {
+  // 背景：仓库未配置 NPM_TOKEN 时，旧实现直接 ::error:: + exit 1，整个 job 判红、
+  // 其后的「Create GitHub Release」永不执行——「打 tag 出 Release」被 npm 凭据绑死。
+  // 现改为：独立步骤判断 token 存在性（token 只在该步骤 env 内可见，不进 job 级 env），
+  // publish 步骤按该步骤 outputs 跳过。故本文件不得回潮为「缺 token 即中止」。
+  assert.ok(RELEASE.includes('id: npm-token'),
+    'release.yml 必须有 token 存在性判定步骤（id: npm-token）')
+  assert.ok(RELEASE.includes("if: ${{ steps.npm-token.outputs.present == 'true' }}"),
+    'npm 发布步骤必须由 npm-token 输出 gate（缺 token 时跳过而非判红）')
+  assert.ok(!RELEASE.includes('NPM_TOKEN secret 未配置——发布中止'),
+    'release.yml 不得回潮为「缺 token 即 exit 1」——那会让 tag 推不出 GitHub Release')
+  for (const s of ['Create GitHub Release (curated notes)', 'Create GitHub Release (fallback auto-notes)']) {
+    assert.ok(RELEASE.includes(s), `release.yml 缺少 ${s} 步骤（Release 创建面被改动）`)
+  }
+})
+
 test('observe.yml: 夜间调度 + 硬门禁执行点 + issues 写权限', () => {
   assert.ok(OBSERVE.includes('cron:'), 'schedule 触发器在位')
   assert.ok(OBSERVE.includes('workflow_dispatch'), '支持手动 dispatch')

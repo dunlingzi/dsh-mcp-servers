@@ -3,7 +3,9 @@ name: Release
 # Tag-triggered publish：推 vX.Y.Z tag 是唯一发布开关。
 # 校验包版本 == tag 版本（tag 是版本唯一来源）→ 全量门禁 →
 # pnpm publish（本仓为单插件仓库：唯一发布物 @dunlingzi/dsh-mcp-servers）→ 生成 GitHub Release。
-# 需要仓库 secret NPM_TOKEN（@dunlingzi scope 的 npm automation token）。
+# npm 发布用仓库 secret NPM_TOKEN（@dunlingzi scope 的 npm automation token）。
+# 未配置 token 时**跳过** npm 发布（发 notice），tag 校验 / 门禁 / GitHub Release 照常执行
+# ——即「打 tag 出 Release」不依赖 npm 凭据；配置 token 后重跑同一 tag 的 run 即可补发。
 
 on:
   push:
@@ -69,14 +71,28 @@ jobs:
       - name: Pack check
         run: pnpm pack:check
 
+      # 发布开关：本步骤只判断 token 是否存在。token 仅在本步骤 env 内可见（不进 job 级
+      # env，避免暴露给其余步骤）；GitHub 不允许在 if 里直接引用 secrets，故经 outputs 传递。
+      - name: Check npm token（决定是否执行 npm 发布）
+        id: npm-token
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "$NPM_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "NPM_TOKEN 已配置——本次将发布到 npm"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::NPM_TOKEN secret 未配置——跳过 npm 发布，本次 tag 只创建 GitHub Release（在仓库 Settings → Secrets and variables → Actions 配置 @dunlingzi scope 的 npm automation token 后，重跑本 run 即可补发）"
+          fi
+
       - name: Publish to npm（幂等：版本已存在自动跳过）
+        if: ${{ steps.npm-token.outputs.present == 'true' }}
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -e
-          if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
-            echo "::error::NPM_TOKEN secret 未配置——发布中止（仓库 Settings → Secrets and variables → Actions 配置 @dunlingzi scope 的 npm automation token）"
-            exit 1
-          fi
-          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
           while read -r pkg; do
             [ -z "$pkg" ] && continue
             echo "==> publish $pkg"
