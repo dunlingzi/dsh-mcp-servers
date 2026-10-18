@@ -14,11 +14,11 @@ MCP 协议客户端基于官方 SDK 传输层（stdio 子进程 + streamable-htt
 
 ## 核心优势
 
-- **上下文成本可控**：项目级 MCP 默认经中间层收敛，模型面只占 `ws_mcp_list` /
-  `ws_mcp_detail` / `ws_mcp_search` / `ws_mcp_call` 四个原子工具位——当前工作空间
-  的项目级接多少台服务器、多少个工具都不膨胀系统提示词；`middleware: all` 可把
-  全局服务器也收进中间层，实现全量收敛（两级发现：`ws_mcp_list` 完整盘点 →
-  `ws_mcp_detail` 按需拉完整 schema）
+- **上下文成本可控**：默认 `middleware: lazy` 下模型面只占 `ws_mcp_search` /
+  `ws_mcp_list` / `ws_mcp_detail` / `ws_mcp_call` / `ws_mcp_load` 五个网关工具位——接多少
+  台服务器、多少个工具都不膨胀系统提示词；真实工具定义按需装载（两级发现：
+  `ws_mcp_search` / `ws_mcp_list` 定位 → `ws_mcp_load` 装载强类型 schema）。`middleware:
+  project` / `all` 可切回「启动即全量注册」的旧口径
 - **分工作目录维护**：项目级配置 `<项目根>/.dsh/mcp.json` 随仓库走、可提交 git 团队共享；
   全局配置 `<DSH_HOME>/dsh-mcp.json` 常连；切换会话自动加载当前目录的 MCP 集
 - **工作空间隔离**：中间层以会话 cwd 路由到对应连接池，server 全名一致性校验防跨空间
@@ -28,6 +28,11 @@ MCP 协议客户端基于官方 SDK 传输层（stdio 子进程 + streamable-htt
 - **运维省心**：运行中/连接中/失败等分级状态一目了然；断线有界指数退避自动重连；
   每台服务器可独立「测试」探活（连接一次即断，报告延迟与工具数，不改连接状态）；
   直连模式下工具结果按 8KB 截断、调用超时可按 server 覆盖（`toolCallTimeoutMs`）
+
+**按需加载（`middleware: lazy`）**：常驻工具面只留约五个网关工具，其余 MCP 工具一律按需
+加载——模型先用 `ws_mcp_search` / `ws_mcp_list` 找到工具名，再调 `ws_mcp_load` 激活其真实
+类型定义（含完整 `inputSchema`），随后直接调用 `mcp__<server>__<tool>`。启动时不再注册任何
+`mcp__` 工具，每轮请求因此不再携带全量 MCP 工具 schema。
 
 ## 安装
 
@@ -89,26 +94,32 @@ npx @deepseek-ai/dsh plugin --profile web update @dunlingzi/dsh-mcp-servers
 - **启停开关**：开启 = 保存配置并连接（热生效）；关闭 = 断开并停用，配置保留
 - **测试**：对目标服务器做一次性 MCP 连接（initialize + tools/list），报告延迟与
   工具数；不改连接状态、不注册工具，用于诊断「连没连得上」
-- **中间层模式**：`off / project / all` 下拉，效果说明单独一行；保存即热生效并
+- **中间层模式**：`off / project / all / lazy` 下拉，效果说明单独一行；保存即热生效并
   持久化，无需重启 dsh web；保存后配置热加载即时生效，页面状态经 SSE 推送自动刷新
 
 ## 配置（中间层）
 
-项目级 MCP 经中间层访问（`middleware: project`，默认）：项目级服务器不再注册
-`mcp__` 工具，改经模型面四个原子工具访问——`ws_mcp_list`（完整盘点当前工作空间全部
-服务器 + 每台完整工具清单）/ `ws_mcp_detail`（按 `@<root>/<server>` + tool 裸名精确
-查询单工具完整 `inputSchema`）/ `ws_mcp_search`（关键词检索，先搜后调）/
-`ws_mcp_call`（按 `@<root>/<server>` 全名调用），执行时按调用方会话当前 cwd 路由到
-对应工作空间连接池；全局服务器仍直呼 `mcp__<server>__<tool>`。切换 `middleware: off`
-回到旧行为（全部直接注册 `mcp__` 工具）；`middleware: all` 则全局服务器也走中间层
-（cwd 无项目时回落全局虚拟 root `@global`），模型面完全收敛为四个原子工具。
+默认 `middleware: lazy`（按需加载，常驻工具面最小）：全局与项目级服务器都由中间层连接池
+托管，但**启动时不注册任何 `mcp__` 工具**；模型先用 `ws_mcp_search` / `ws_mcp_list` 定位
+工具，再调 `ws_mcp_load` 加载真实类型定义（含完整 `inputSchema`），加载后同名
+`mcp__<server>__<tool>` 在下一步即可直接调用。常驻工具面因此从数十个工具收敛到约五个网关
+工具（`ws_mcp_search` / `ws_mcp_list` / `ws_mcp_detail` / `ws_mcp_call` / `ws_mcp_load`）。
+
+其它模式（语义不变，可随时在设置页切回）：
+
+- `middleware: project`：项目级服务器经中间层四个原子工具访问（项目级不再注册 `mcp__`
+  工具），全局服务器仍直呼 `mcp__<server>__<tool>`；执行时按调用方会话当前 cwd 路由到
+  对应工作空间连接池。
+- `middleware: all`：全局服务器也走中间层（cwd 无项目时回落全局虚拟 root `@global`），
+  但**启动即全量注册**真实工具定义——模型面与旧版一样携带全部 MCP 工具 schema。
+- `middleware: off`：旧行为，全部服务器直接注册 `mcp__` 工具。
 
 **中间层模式可在设置页热切换**（设置 → MCP 服务器 → 中间层模式下拉），保存即生效
 并持久化，无需重启 dsh web。
 
 | 键 | 值域 | 默认 |
 | --- | --- | --- |
-| `middleware` | `off` / `project`（推荐）/ `all` | `project` |
+| `middleware` | `lazy`（推荐）/ `off` / `project` / `all` | `lazy` |
 | `middlewarePolicy` | `{ allowTools: {<serverKey>: [glob]}, denyTools: {<serverKey>: [glob]} }`（serverKey 为 `@<root>/<server>` 全名（工作空间隔离）或裸名（跨空间共用），全名优先；deny 优先） | `{}` |
 
 ## 路由（全部 loopback 围栏）
