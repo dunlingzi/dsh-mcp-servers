@@ -62,7 +62,7 @@ export function buildConfigRoute(manager: RoutesManager, helpers: RouteHelpers):
         writeJson(res, 200, { middleware: manager.middlewareMode ?? "off" });
         return;
       }
-      // POST：热切换中间层模式（middleware: off/project/all）。写操作只对
+      // POST：热切换中间层模式（middleware: off/project/all/lazy）。写操作只对
       // loopback 开放；经设置命名空间落盘（触发 scope.watch → onChange 同步），
       // 无需重启 dsh web。
       if (req.method === "POST") {
@@ -86,7 +86,7 @@ export function buildConfigRoute(manager: RoutesManager, helpers: RouteHelpers):
           }
           // B7：非法 middleware 显式 400 拒绝——不得静默回落 off 并热切换+落盘
           // （合法集合与 config-schema z.union 同源，勿只依赖 normalize 兜底）。
-          if (rec.middleware !== "off" && rec.middleware !== "project" && rec.middleware !== "all") {
+          if (rec.middleware !== "off" && rec.middleware !== "project" && rec.middleware !== "all" && rec.middleware !== "lazy") {
             writeJson(res, 400, { error: `invalid middleware mode: ${rec.middleware}` });
             return;
           }

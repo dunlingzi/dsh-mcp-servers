@@ -30,6 +30,8 @@ export interface ProgressiveDisclosureStats {
   lists: Record<string, number>;
   /** ws_mcp_detail schema 查询频次（server/tool -> 次数） */
   details: Record<string, number>;
+  /** ws_mcp_load 装载频次（server/tool -> 次数；幂等命中不计数） */
+  loadCounts: Record<string, number>;
 }
 
 export interface McpStatsSnapshot {
@@ -37,6 +39,8 @@ export interface McpStatsSnapshot {
   updatedAt: string;
   servers: Record<string, ServerStats>;
   disclosure: ProgressiveDisclosureStats;
+  /** 当前已装载工具数（lazy 模式按需注册的实际生效数；其它模式恒 0）。 */
+  loadedTools: number;
 }
 
 export interface DebugConfig {

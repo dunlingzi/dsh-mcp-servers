@@ -1,12 +1,12 @@
 {
   "name": "@dunlingzi/dsh-mcp-servers",
   "version": "0.1.2",
-  "description": "DSH MCP 服务器管理插件：设置页「MCP 服务器」入口，面板按状态分级展示 MCP 服务器（运行中/连接中/未连接/失败），支持新增/编辑/启停/删除与单次探活（stdio / streamable-http 表单 + 粘贴 mcpServers JSON 导入）。已连接服务器的工具以 mcp__<server>__<tool> 注册给模型直接调用；项目级默认经中间层 ws_mcp_* 四原子工具收敛模型面。",
+  "description": "DSH MCP 服务器管理插件：设置页「MCP 服务器」入口，面板按状态分级展示 MCP 服务器（运行中/连接中/未连接/失败），支持新增/编辑/启停/删除与单次探活（stdio / streamable-http 表单 + 粘贴 mcpServers JSON 导入）。默认 middleware: lazy——模型面只常驻 ws_mcp_* 网关工具，真实工具定义经 ws_mcp_load 按需注册，装载后可直接调用 mcp__<server>__<tool>。",
   "type": "module",
   "main": "lib/index.js",
   "scripts": {
     "build": "node ../../scripts/build/clean-lib.ts && tsc -p tsconfig.json && node ../../scripts/build/bundle-host.ts .",
-    "test": "node ../../scripts/test/run-vitest.mjs --min 18",
+    "test": "node ../../scripts/test/run-vitest.mjs --min 21",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prepublishOnly": "pnpm run typecheck && pnpm run build && pnpm test"
   },

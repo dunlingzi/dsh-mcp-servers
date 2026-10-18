@@ -6,7 +6,7 @@
 
 import type { McpMiddleware } from "../connection/runtime/interface.ts";
 import { withTimeout } from "../pipeline/interface.ts";
-import { parseFullServerName, MIDDLEWARE_GLOBAL_ROOT } from "../workspace/interface.ts";
+import { parseFullServerName, MIDDLEWARE_GLOBAL_ROOT, coversGlobal } from "../workspace/interface.ts";
 import type { MiddlewareMode } from "../types/interface.ts";
 import type { McpStatsCollector } from "../stats/interface.ts";
 
@@ -30,18 +30,18 @@ export async function waitForDiscovery(unit: NonNullable<Awaited<ReturnType<McpM
 }
 
 /**
- * all 模式可见单元集合：项目 root + @global（评审 A 全局可见性修复）。
- * root 本身为 @global 时去重（防 all 模式无项目 cwd 下服务器翻倍）。
+ * all / lazy 模式可见单元集合：项目 root + @global（评审 A 全局可见性修复）。
+ * root 本身为 @global 时去重（防无项目 cwd 下服务器翻倍）。
  */
 export function visibleMiddlewareRoots(root: string | undefined, mode: MiddlewareMode): string[] {
   if (root === undefined) return [];
-  if (mode !== "all") return [root];
+  if (!coversGlobal(mode)) return [root];
   return root === "@global" ? ["@global"] : [root, "@global"];
 }
 
 /**
  * 路由一致性校验（detail/call 共用；A2）：目标 root 必须等于当前 root，
- * 或 all 模式下的 @global（全局配置跨工作空间共享，语义成立）。
+ * 或 all / lazy 模式下的 @global（全局配置跨工作空间共享，语义成立）。
  * project 模式传全局级服务器 → 引导改用 mcp__ 直呼（全局 mcp__ 工具在该
  * 模式下仍注册可用）；非 global 的其他 root / 未知 @global 服务器一律硬拒绝
  * （防跨空间串台与 project 模式经 @global 路由绕过）。
@@ -63,7 +63,7 @@ export async function checkMiddlewareRoot(
       `${caller}: server ${JSON.stringify(server)} 不属于当前工作空间 ${JSON.stringify(root)}；路由一致性校验失败（防跨空间串台）`,
     );
   }
-  if (parsed.root === MIDDLEWARE_GLOBAL_ROOT && mode !== "all") {
+  if (parsed.root === MIDDLEWARE_GLOBAL_ROOT && !coversGlobal(mode)) {
     const bare = parsed.server;
     const known = mw.host.isGlobalServer(bare) || mw.units.get(MIDDLEWARE_GLOBAL_ROOT)?.catalog.has(bare) === true;
     if (known) {

@@ -50,7 +50,8 @@ const WATCHDOG_MS = 60_000;
 export function McpServersPage(props: { ctx: any; shared: SharedSessionState }): any {
   const { shared } = props;
   const [summary, setSummary] = React.useState(null as Summary | null);
-  const [middleware, setMiddleware] = React.useState("project" as string);
+  // 初值与宿主默认同源（lazy）：首次 GET /servers 前也显示正确模式，避免闪一下 project。
+  const [middleware, setMiddleware] = React.useState("lazy" as string);
   const [error, setError] = React.useState("" as string);
   const [view, setView] = React.useState(null as PageView);
   const [mounted, setMounted] = React.useState(false);

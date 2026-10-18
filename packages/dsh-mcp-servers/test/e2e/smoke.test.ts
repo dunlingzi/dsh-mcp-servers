@@ -711,14 +711,15 @@ it("回前台强制重建 SSE + 受控重建连接（visibilitychange → rebind
   expect(clientSrc, "onopen 触发宿主会话恢复探测").toMatch(/maybeRecoverSession\(\)/);
 });
 
-it("Config 导出且默认中间层 project（无浮窗 ui 子对象）", () => {
+it("Config 导出且默认中间层 lazy（P4；无浮窗 ui 子对象）", () => {
   expect(typeof Config === "function", "Config 是 schemastery schema（可调用）").toBeTruthy();
   const parsed = Config({});
-  expect(parsed.middleware, "middleware 默认 project（项目级收敛）").toBe("project");
+  expect(parsed.middleware, "middleware 默认 lazy（按需装载，常驻工具面最小）").toBe("lazy");
   expect(parsed.middlewarePolicy, "middlewarePolicy 默认空策略").toEqual({});
   expect("ui" in parsed, "浮窗 ui 子对象已随浮窗形态退役").toBeFalsy();
   expect(Config({ middleware: "off" }).middleware, "off 是合法值域").toBe("off");
   expect(Config({ middleware: "all" }).middleware, "all 是合法值域").toBe("all");
+  expect(Config({ middleware: "project" }).middleware, "project 仍是合法值域（可切回）").toBe("project");
 });
 it("README 含中间层模式与热更新说明（键名与默认值，中英）", () => {
   for (const file of ["README.md", "README.en.md"]) {

@@ -286,11 +286,11 @@ describe("resolveMiddlewareMode 三态", () => {
     expect(resolveMiddlewareMode(manager, "off")).toBe("off");
   });
 
-  it("无 fallback 回落 schema 默认 project", () => {
-    // 态 2b：settings 无值且无 fallback → schema 默认 project（第一启动形态）
+  it("无 fallback 回落 schema 默认 lazy（P4）", () => {
+    // 态 2b：settings 无值且无 fallback → schema 默认 lazy（第一启动形态）
     const manager = makeManagerFixture();
     manager.uiConfigSource = () => ({});
-    expect(resolveMiddlewareMode(manager, undefined)).toBe("project");
+    expect(resolveMiddlewareMode(manager, undefined)).toBe("lazy");
   });
 
   it("settings 非法值回落 off", () => {

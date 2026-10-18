@@ -27,6 +27,7 @@ import {
   MIDDLEWARE_GLOBAL_ROOT,
   findProjectRoot,
   normalizedProjectRoot,
+  coversGlobal,
 } from "../../workspace/interface.ts";
 import { catalogCacheFile, summarizeToolDescriptions, makeCatalogViewFor } from "../../catalog/interface.ts";
 import type { CatalogViewResolver } from "../../catalog/interface.ts";
@@ -308,6 +309,12 @@ export class McpServers {
   setMiddlewareMode?: (mode: MiddlewareMode) => Promise<void>;
 
   /**
+   * lazy 模式的按需注册清理回调（apply 注入）：服务器被删除时精确注销其真实
+   * 定义（C2 的会话中途「不卸载」仅豁免服务器删除这一种情形）。传裸名。
+   */
+  onServerRemoved?: (name: string) => void;
+
+  /**
    * 设置/解除单个工具禁用（宿主 API PATCH /api/dsh-mcp-servers/tool-disable 调用）。
    * 合并式写盘（先读现有文件再覆盖本 root 段，绝不整表覆盖）——
    * 防多工作空间互相抹掉禁用记录。
@@ -436,8 +443,8 @@ export class McpServers {
     }
     if (this.middlewareMode !== "off" && this.middleware !== undefined) {
       // 中间层：仅触达单元（fire-and-forget 惰性连接在 projectUnitFor 内）。
-      // all 模式：无项目 cwd 也触达全局虚拟 root @global。
-      const target = root !== undefined ? root : (this.middlewareMode === "all" ? MIDDLEWARE_GLOBAL_ROOT : undefined);
+      // all / lazy 模式：无项目 cwd 也触达全局虚拟 root @global。
+      const target = root !== undefined ? root : (coversGlobal(this.middlewareMode) ? MIDDLEWARE_GLOBAL_ROOT : undefined);
       if (target !== undefined) {
         void this.middleware.projectUnitFor(target).then((unit) => {
           if (unit !== undefined) this.middleware?.evictIfNeeded();
@@ -454,7 +461,7 @@ export class McpServers {
    * 切回前台恢复：对当前工作空间连接的受控重建（对齐 SSE forceReconnect，#412）。
    * 移动端切后台会静默掐断 TCP（半开，双方收不到 FIN/RST → transport onClose 不触发），
    * 连接池 entry 可能卡在 connected 而实际已死；此入口忽略当前状态 force 重建
-   * 当前工作空间单元（当前项目 root；all 模式无项目时回退 @global）内所有非
+   * 当前工作空间单元（当前项目 root；all / lazy 模式无项目时回退 @global）内所有非
    * userDisabled 连接。force 重建健康连接一次代价低（本地 stdio / http 重连毫秒级），
    * 与 SSE 每次切回前台 forceReconnect 的语义对称。调用方：POST /api/dsh-mcp-servers/resume
    *（客户端 visibilitychange 回前台触发）。
@@ -469,7 +476,7 @@ export class McpServers {
   async resumeReconnect(): Promise<void> {
     const mw = this.middleware;
     if (mw === undefined || this.middlewareMode === "off") return;
-    const root = this.projectRoot ?? (this.middlewareMode === "all" ? MIDDLEWARE_GLOBAL_ROOT : undefined);
+    const root = this.projectRoot ?? (coversGlobal(this.middlewareMode) ? MIDDLEWARE_GLOBAL_ROOT : undefined);
     if (root === undefined) return;
     // 单元缺失（宿主重启/状态丢失）先创建：projectUnitFor 负责惰性连接兜底。
     const unit = mw.units.get(root) ?? (await mw.projectUnitFor(root));
@@ -677,6 +684,9 @@ export class McpServers {
     }
     store.remove(name);
     await store.save();
+    // lazy 模式：服务器被删除 → 注销其按需注册过的真实定义（避免保留一个永远
+    // 调不通的工具；会话中途的其它场景一律不卸载，见懒装载设计稿 C2）。
+    this.onServerRemoved?.(name);
   }
 
   async connect(name: string, scope: string = SCOPE_GLOBAL, directConfig?: ServerConfig): Promise<void> {
@@ -740,7 +750,7 @@ export class McpServers {
         // 项目级：定位当前项目 root 单元（同名跨 scope 修正——此前 all 模式
         // 误用全局 store 定位 @global，同名项目级服务器被写错单元）。
         targetUnit = this.projectRoot !== undefined ? this.middleware.units.get(this.projectRoot) : undefined;
-      } else if (this.middlewareMode === "all" && this.store.find(name) !== undefined && !this.runtimeRegistry.has(name)) {
+      } else if (coversGlobal(this.middlewareMode) && this.store.find(name) !== undefined && !this.runtimeRegistry.has(name)) {
         targetUnit = this.middleware.units.get(MIDDLEWARE_GLOBAL_ROOT);
       } else {
         targetUnit = [...this.middleware.units.values()].find((unit) => unit.connections.has(name) || unit.userDisabled.has(name));

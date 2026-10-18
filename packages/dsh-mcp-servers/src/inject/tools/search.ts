@@ -78,11 +78,18 @@ async function executeSearch(
   return { results: filtered, unavailable, truncated };
 }
 
+/** 检索结果的调用引导（按模式补一句；lazy 下命中不是「已可调用」，需先 load）。 */
+function callGuidance(mode: string): string {
+  return mode === "lazy"
+    ? " In lazy mode a hit is not callable yet: activate it with ws_mcp_load, then call the typed mcp__<server>__<tool> directly."
+    : "";
+}
+
 export function buildSearchTool(toolCtx: MiddlewareToolContext): ToolDefinition {
   return {
     name: "ws_mcp_search",
     description:
-      "Search workspace MCP tools catalog by keyword (matches server, tool, description, and parameter names). Search first, then invoke with ws_mcp_call; use ws_mcp_list for full inventory audits. Empty query returns capability summary.",
+      `Search workspace MCP tools catalog by keyword (matches server, tool, description, and parameter names). Search first, then invoke with ws_mcp_call; use ws_mcp_list for full inventory audits. Empty query returns capability summary.${callGuidance(toolCtx.mode)}`,
     parameters: {
       type: "object",
       properties: {

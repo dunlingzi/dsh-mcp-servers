@@ -9,6 +9,7 @@ import type { McpMiddleware } from "../../connection/runtime/interface.ts";
 import type { MiddlewareMode } from "../../types/interface.ts";
 import { LIST_DEFAULT_TOOLS_PER_SERVER, LIST_MAX_TOOLS_PER_SERVER } from "../../connection/runtime/interface.ts";
 import { listCatalog } from "../../catalog/interface.ts";
+import { coversGlobal } from "../../workspace/interface.ts";
 import { type MiddlewareToolContext, waitForDiscovery, visibleMiddlewareRoots } from "../middleware-shared.ts";
 
 /** 项目级可见服务器名列表（A1 归因文案用；排序去重）。 */
@@ -84,9 +85,13 @@ function resolveEmptyListMessage(
   if (serverFilter !== undefined) {
     const visible = visibleProjectServers(mw, root);
     const visibleText = visible.length > 0 ? `可见项目级服务器：${visible.join(" / ")}；` : "当前工作空间无已发现的项目级服务器；";
-    return `没有匹配 server=${JSON.stringify(serverFilter)} 的项目级服务器。${visibleText}全局级服务器不在此列出，请用 mcp__<server>__<tool> 前缀工具访问`;
+    // all / lazy 同口径：全局服务器也经中间层列出，不能再引导 mcp__ 直呼（lazy 下根本没注册）。
+    const hint = coversGlobal(mode)
+      ? "当前工作空间与 @global 均无匹配服务器；全局级服务器同样经中间层列出"
+      : "全局级服务器不在此列出，请用 mcp__<server>__<tool> 前缀工具访问";
+    return `没有匹配 server=${JSON.stringify(serverFilter)} 的项目级服务器。${visibleText}${hint}`;
   }
-  return mode === "all"
+  return coversGlobal(mode)
     ? "当前工作空间没有可用 MCP 服务器（项目级与全局均未发现；若刚添加配置，请稍后重试）"
     : "当前工作空间没有可用 MCP 服务器（未配置项目级服务器；若刚添加配置，请稍后重试）";
 }
@@ -98,7 +103,7 @@ async function resolveListWithoutUnit(
   serverFilter: string | undefined,
   toolLimit: number,
 ) {
-  if (mode !== "all") {
+  if (!coversGlobal(mode)) {
     return {
       workspace: root,
       mode,

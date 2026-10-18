@@ -86,6 +86,7 @@ export {
   bareServerName,
   normalizeToolName,
   normalizeMiddlewareMode,
+  coversGlobal,
 } from "./workspace/interface.ts";
 // 执行管道域（两路径同构纯函数族）
 export {
@@ -164,6 +165,9 @@ export type {
 } from "./stats/interface.ts";
 // 工具注册面（inject）
 export { registerMiddlewareTools, registerDirectMcpGuard } from "./inject/interface.ts";
+// lazy 模式按需注册面（ws_mcp_load 的装载器与模型面定义构建）
+export { createRegistrar, buildLazyDefinition } from "./inject/interface.ts";
+export type { Registrar, LazyLoadable, LazyRegistrarStats } from "./inject/interface.ts";
 // 共享类型面（types 域）
 export type {
   MiddlewareMode,
@@ -174,6 +178,8 @@ export type {
   ListServerEntry,
   ListCatalogResult,
   ToolDetail,
+  LoadedToolEntry,
+  LoadResult,
   DisabledToolsMap,
   ServerConfig,
   ServerStatus,

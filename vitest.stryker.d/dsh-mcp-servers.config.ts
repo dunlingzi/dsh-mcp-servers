@@ -8,12 +8,14 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     include: [
+      'packages/dsh-mcp-servers/test/integration/lazy-tool-face.test.ts',
       'packages/dsh-mcp-servers/test/unit/unit-apply.test.ts',
       'packages/dsh-mcp-servers/test/unit/unit-call-stats.test.ts',
       'packages/dsh-mcp-servers/test/unit/unit-catalog.test.ts',
       'packages/dsh-mcp-servers/test/unit/unit-client-core.test.ts',
       'packages/dsh-mcp-servers/test/unit/unit-hotspot.test.ts',
       'packages/dsh-mcp-servers/test/unit/unit-inject-tools.test.ts',
+      'packages/dsh-mcp-servers/test/unit/unit-lazy.test.ts',
       'packages/dsh-mcp-servers/test/unit/unit-manager.test.ts',
       'packages/dsh-mcp-servers/test/unit/unit-manager2.test.ts',
       'packages/dsh-mcp-servers/test/unit/unit-middleware.test.ts',

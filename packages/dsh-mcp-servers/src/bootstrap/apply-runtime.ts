@@ -19,7 +19,7 @@ import { resolveCatalogInjection } from "../catalog/interface.ts";
 import { normalizeMiddlewareMode } from "../workspace/interface.ts";
 import type { McpServers } from "../connection/interface.ts";
 import { registerMiddlewareTools, registerDirectMcpGuard } from "../inject/interface.ts";
-import type { MiddlewareMode } from "../types/interface.ts";
+import type { MiddlewareMode, Registrar } from "../types/interface.ts";
 import { makeRoutes, makeEventsRoute, makeHealthRoute } from "../api/interface.ts";
 import { sseData } from "../../../../shared/host-utils.js";
 
@@ -39,14 +39,19 @@ export function createEmptyDisposers(): ApplyDisposers {
 
 /**
  * 中间层模式热切换（设置页「中间层模式」下拉；initMiddleware 幂等已有，
- * off↔project/all 需重新注册/卸载中间层工具——dispose 后重建）。
- * 注册在模式分支之外：启动即 off 时也能从设置页切到 project/all。
+ * off↔project/all/lazy 需重新注册/卸载中间层工具——dispose 后重建）。
+ * 注册在模式分支之外：启动即 off 时也能从设置页切到 project/all/lazy。
+ *
+ * @param options.registrar lazy 模式的按需定义注册器（其它模式不使用）。
+ * @param options.onModeApplied 模式生效后的附加重建（apply 用它重注册系统提示词
+ *   section：lazy 的调用引导与其它模式相反，不同步就会自相矛盾）。
  */
 export function makeMiddlewareHotSwitch(
   manager: McpServers,
   middlewarePolicy: Record<string, unknown> | undefined,
   resolveRoot: (agent: unknown) => Promise<string | undefined>,
   dispose: { current: () => void },
+  options: { registrar?: Registrar; onModeApplied?: (mode: MiddlewareMode) => void } = {},
 ): (mode: MiddlewareMode) => Promise<void> {
   return async (mode: MiddlewareMode): Promise<void> => {
     if (normalizeMiddlewareMode(mode) === manager.middlewareMode) return;
@@ -58,14 +63,17 @@ export function makeMiddlewareHotSwitch(
       dispose.current = registerMiddlewareTools(manager.ctx, mw, resolveRoot, next, {
         disabledTools: manager.disabledTools,
         stats: manager.stats,
+        registrar: options.registrar,
       });
     } else {
       // D8：off 模式无中间层实例，独立注册 mcp__ 直呼守卫（数据源直查禁用表）。
       const guardDispose = registerDirectMcpGuard(manager.ctx, manager.disabledTools, resolveRoot);
       if (guardDispose !== undefined) dispose.current = guardDispose;
     }
-    // off ↔ project/all：重注册/卸载中间层工具后 reconcile——all 模式下全局
-    // supervisor 由 reconcile 停掉、新全局条目经 start 内部接管触达 @global
+    // 文案与工具面同源：section 按新模式重注册（lazy 的引导句完全不同）。
+    options.onModeApplied?.(next);
+    // off ↔ project/all/lazy：重注册/卸载中间层工具后 reconcile——all/lazy 模式下
+    // 全局 supervisor 由 reconcile 停掉、新全局条目经 start 内部接管触达 @global
     // 单元（#382 F3）；off 语义停掉全部中间层接管条目。防同一 server 双进程。
     manager.reconcileServers();
     manager.logger.info(`dsh-mcp-servers: middleware mode=${next} (hot-switched)`);

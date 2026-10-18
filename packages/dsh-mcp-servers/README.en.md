@@ -18,12 +18,13 @@ streamable-http), inlined at build time with zero runtime dependencies.
 
 ## Highlights
 
-- **Bounded context cost**: project-level MCP servers converge through the
-  middleware — the model face only occupies four atomic tool slots
-  (`ws_mcp_list` / `ws_mcp_detail` / `ws_mcp_search` / `ws_mcp_call`), no
-  matter how many servers or tools the workspace registers. `middleware: all`
-  converges global servers too (two-level discovery: full inventory via
-  `ws_mcp_list`, full schema on demand via `ws_mcp_detail`)
+- **Bounded context cost**: the default `middleware: lazy` keeps only five
+  gateway tool slots (`ws_mcp_search` / `ws_mcp_list` / `ws_mcp_detail` /
+  `ws_mcp_call` / `ws_mcp_load`), no matter how many servers or tools exist;
+  real tool definitions are loaded on demand (two-level discovery: locate via
+  `ws_mcp_search` / `ws_mcp_list`, activate the typed schema with
+  `ws_mcp_load`). `middleware: project` / `all` switch back to the legacy
+  "register everything at startup" behaviour
 - **Per-project configuration**: project config lives at `<project root>/.dsh/mcp.json`
   (travels with the repo, committable); global config at `<DSH_HOME>/dsh-mcp.json`;
   switching sessions auto-loads the matching MCP set
@@ -36,6 +37,15 @@ streamable-http), inlined at build time with zero runtime dependencies.
   per-server "Test" probe (connect once and close, reporting latency and tool
   count, without touching live connections); 8KB result truncation and
   per-server `toolCallTimeoutMs` override
+
+**On-demand loading (`middleware: lazy`, the default)**: the always-on tool face
+keeps only about five gateway tools, and every other MCP tool is loaded on
+demand. The model finds the tool name with `ws_mcp_search` / `ws_mcp_list`,
+activates its real typed definition (full `inputSchema`) with `ws_mcp_load`,
+then calls `mcp__<server>__<tool>` directly. Nothing is registered at startup,
+so each request no longer carries the whole MCP tool schema. The other modes
+(`project` / `all` / `off`) keep their previous semantics and can be selected
+in Settings at any time.
 
 ## Install
 
@@ -89,22 +99,33 @@ npx @deepseek-ai/dsh plugin --profile web add @dunlingzi/dsh-mcp-servers
   disable, config kept
 - **Test**: one-shot MCP connection (initialize + tools/list) reporting latency
   and tool count; never mutates live connections
-- **Middleware mode**: `off / project / all` dropdown, with the effective
+- **Middleware mode**: `off / project / all / lazy` dropdown, with the effective
   behaviour explained on its own line — saving hot-applies and persists
   without restarting dsh web; config changes hot-load and the page refreshes via
   SSE push
 
 ## Configuration (middleware)
 
-`middleware: project` (default): project-level servers no longer register
-`mcp__` tools; the model reaches them through the four atomic tools.
-`middleware: off` restores direct registration for everything; `middleware: all`
-converges global servers too (falling back to the global virtual root `@global`
-when the session has no project cwd).
+`middleware: lazy` (default): global and project-level servers are held by the
+middleware pool, but **nothing is registered at startup**. The model locates a
+tool with `ws_mcp_search` / `ws_mcp_list`, loads its real typed definition with
+`ws_mcp_load`, and the same `mcp__<server>__<tool>` becomes directly callable on
+the next step. The always-on surface therefore shrinks from dozens of tools to
+about five gateway tools (`ws_mcp_search` / `ws_mcp_list` / `ws_mcp_detail` /
+`ws_mcp_call` / `ws_mcp_load`).
+
+The other modes keep their semantics and can be selected in Settings at any time:
+
+- `project`: project-level servers no longer register `mcp__` tools; the model
+  reaches them through the four atomic tools; global servers stay direct.
+- `all`: global servers converge too (falling back to the global virtual root
+  `@global` when the session has no project cwd), but real definitions are
+  registered at startup — the model face carries every MCP tool schema again.
+- `off`: legacy behaviour, every server registers `mcp__` tools directly.
 
 | Key | Values | Default |
 | --- | --- | --- |
-| `middleware` | `off` / `project` (recommended) / `all` | `project` |
+| `middleware` | `lazy` (recommended) / `off` / `project` / `all` | `lazy` |
 | `middlewarePolicy` | `{ allowTools: {<serverKey>: [glob]}, denyTools: {<serverKey>: [glob]} }` (full name `@<root>/<server>` takes precedence over bare name; deny wins) | `{}` |
 
 ## Routes (loopback only)
