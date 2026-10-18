@@ -4,14 +4,14 @@
   "packages": {
     "dsh-mcp-servers": {
       "modules": 14,
-      "scannedSrcFiles": 70,
-      "allSrcTsFiles": 82,
+      "scannedSrcFiles": 72,
+      "allSrcTsFiles": 84,
       "interfaceFacades": 14,
       "leafValueEdges": 33,
       "leafModuleCycles": 3,
-      "fileValueEdges": 141,
+      "fileValueEdges": 154,
       "fileCycles": 1,
-      "crossModuleRefs": 153,
+      "crossModuleRefs": 170,
       "raLegacy": 56,
       "raLegacyValue": 31,
       "raLegacyType": 25,
