@@ -78,11 +78,18 @@ async function executeCall(
   }
 }
 
+/** 调用方式的模式引导：lazy 下 ws_mcp_call 只作一次性逃生口。 */
+function loadGuidance(mode: string): string {
+  return mode === "lazy"
+    ? " In lazy mode this is the one-off escape hatch: for a tool you will call more than once, load it with ws_mcp_load and call the typed mcp__<server>__<tool> instead."
+    : "";
+}
+
 export function buildCallTool(toolCtx: MiddlewareToolContext): ToolDefinition {
   return {
     name: "ws_mcp_call",
     description:
-      "Invoke an MCP tool in the current workspace (executes on live server). Verify parameter schema with ws_mcp_detail beforehand (can invoke directly if server and tool are known); obtain user consent before write or sensitive operations.",
+      `Invoke an MCP tool in the current workspace (executes on live server). Verify parameter schema with ws_mcp_detail beforehand (can invoke directly if server and tool are known); obtain user consent before write or sensitive operations.${loadGuidance(toolCtx.mode)}`,
     parameters: {
       type: "object",
       properties: {

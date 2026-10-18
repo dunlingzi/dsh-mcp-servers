@@ -12,6 +12,7 @@ import { dirname, join, resolve } from "node:path";
 import { dshHome } from "../../../../shared/dsh-home.js";
 import type { McpServers } from "../connection/interface.ts";
 import { MIDDLEWARE_GLOBAL_ROOT } from "./constants.ts";
+import { coversGlobal } from "./middleware-mode.ts";
 
 /** DSH 全局家目录（shared/dsh-home.js 语义：DSH_HOME 非空白原样采用、空白
  *  视同未设置回落 ~/.dsh；#517 收敛）。resolve 为本处 .dsh 标记排除的对比
@@ -50,14 +51,14 @@ export async function normalizedProjectRoot(cwd: string | undefined): Promise<st
 /** resolveRoot 路由：exec.agent → 归一化项目根（agent-less → undefined）。 */
 export function makeResolveRoot(manager: McpServers): (agent: unknown) => Promise<string | undefined> {
   // 路由输入：exec.agent 当前 cwd = agent.session.header.cwd（实证已闭合）。
-  // all 模式：cwd 无项目（或无项目配置）时 fallback 到全局虚拟 root @global。
+  // all / lazy 模式：cwd 无项目（或无项目配置）时 fallback 到全局虚拟 root @global。
   return async (agent: unknown): Promise<string | undefined> => {
     if (typeof agent !== "object" || agent === null) return undefined;
     const session = (agent as { session?: { header?: { cwd?: unknown } } }).session;
     const cwd = session?.header?.cwd;
     const root = await normalizedProjectRoot(typeof cwd === "string" ? cwd : undefined);
     if (root !== undefined) return root;
-    if (manager.middlewareMode === "all") {
+    if (coversGlobal(manager.middlewareMode)) {
       // B3（requirements 8.1 纠偏）：回落查 projectServersFor("@global")（含
       // runtime 注入并集，#413）而非 globalServers()（仅 store.data.servers）——
       // 否则仅 runtime 注入服务器时回落失败「无法确定工作空间」。

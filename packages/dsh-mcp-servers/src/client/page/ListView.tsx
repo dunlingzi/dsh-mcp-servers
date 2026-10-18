@@ -343,7 +343,9 @@ export function ListView(props: ListViewProps): any {
     ? t("middlewareEffectOff")
     : middleware === "all"
       ? t("middlewareEffectAll")
-      : t("middlewareEffectProject");
+      : middleware === "lazy"
+        ? t("middlewareEffectLazy")
+        : t("middlewareEffectProject");
 
   return (
     <div className="ms-page">
@@ -412,6 +414,7 @@ export function ListView(props: ListViewProps): any {
             <option value="off">{t("middlewareOff")}</option>
             <option value="project">{t("middlewareProject")}</option>
             <option value="all">{t("middlewareAll")}</option>
+            <option value="lazy">{t("middlewareLazy")}</option>
           </select>
           <button
             type="button"

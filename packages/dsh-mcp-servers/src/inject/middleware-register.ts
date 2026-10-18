@@ -8,17 +8,19 @@
  */
 
 import type { Context } from "@deepseek-ai/cordis";
-import type { PreToolDecision } from "@deepseek-ai/dsh-tools";
+import type { PreToolDecision, ToolDefinition } from "@deepseek-ai/dsh-tools";
 import type { McpMiddleware } from "../connection/runtime/interface.ts";
 import type { MiddlewareMode, DisabledToolsMap } from "../types/interface.ts";
 import type { McpStatsCollector } from "../stats/interface.ts";
 import { policyAllows, policyDenialReason, isToolDenied, toolDisabledReason } from "../pipeline/interface.ts";
 import { parseFullServerName, fullServerName, MIDDLEWARE_GLOBAL_ROOT } from "../workspace/interface.ts";
 import { type MiddlewareToolContext } from "./middleware-shared.ts";
+import type { Registrar } from "../types/interface.ts";
 import { buildSearchTool } from "./tools/search.ts";
 import { buildCallTool, parseCallParams } from "./tools/call.ts";
 import { buildListTool } from "./tools/list.ts";
 import { buildDetailTool } from "./tools/detail.ts";
+import { buildLoadTool } from "./tools/load.ts";
 
 // ---------------------------------------------------------------------------
 // Pre-execute Guard 与模型面注册
@@ -71,10 +73,30 @@ async function handleDirectMcpGuard(
   return undefined;
 }
 
+/**
+ * lazy 模式守卫：本插件注册过、但**本 agent 没装载**的 mcp__ 工具 → 拒绝并给出
+ * 可行动的下一步。仅在「全局回退注册」路径上才会命中（agent 作用域注册时其它
+ * agent 根本看不到该工具）；与作用域注册一起构成纵深防御。
+ * 只拦本注册器注册过的名字（isRegistered）——不移交误伤其它插件的 mcp__ 工具。
+ */
+function handleLazyLoadGuard(
+  name: string,
+  agent: unknown,
+  registrar: Registrar | undefined,
+): PreToolDecision | undefined {
+  if (registrar === undefined || !registrar.isRegistered(name)) return undefined;
+  if (registrar.isLoadedBy(agent, name)) return undefined;
+  return {
+    kind: "deny",
+    reason: `工具 ${name} 尚未在本会话装载；请先调用 ws_mcp_load（例如 tools: ["${name}"]），装载后下一步即可直接调用`,
+  };
+}
+
 function registerPreExecuteGuard(
   ctx: Context,
   mw: McpMiddleware,
   resolveRoot: (agent: unknown) => Promise<string | undefined>,
+  lazy: { mode: MiddlewareMode; registrar?: Registrar },
 ): (() => void) | undefined {
   if (typeof ctx.on !== "function") return undefined;
   return ctx.on(
@@ -91,6 +113,10 @@ function registerPreExecuteGuard(
         return next();
       }
       if (name.startsWith("mcp__")) {
+        if (lazy.mode === "lazy") {
+          const lazyDecision = handleLazyLoadGuard(name, exec.agent, lazy.registrar);
+          if (lazyDecision !== undefined) return lazyDecision;
+        }
         const decision = await handleDirectMcpGuard(name, exec.agent, mw.disabledTools, resolveRoot);
         if (decision !== undefined) return decision;
         return next();
@@ -136,12 +162,13 @@ export function registerDirectMcpGuard(
 // ---------------------------------------------------------------------------
 
 /**
- * 注册 ws_mcp_search / ws_mcp_call / ws_mcp_list / ws_mcp_detail 四个中间层工具。
+ * 注册 ws_mcp_search / ws_mcp_call / ws_mcp_list / ws_mcp_detail 四个中间层工具；
+ * lazy 模式下追加 ws_mcp_load（按需装载真实定义）。
  * @param ctx Cordis 宿主上下文。
  * @param mw 中间层实例。
  * @param resolveRoot 路由：exec.agent → 归一化项目根（agent-less → undefined）。
- * @param mode 中间层模式（all 模式合并查询 @global 单元）。
- * @param options 可选配置（支持传入自定义工具级禁用表）。
+ * @param mode 中间层模式（all / lazy 模式合并查询 @global 单元）。
+ * @param options 可选配置（支持传入自定义工具级禁用表与 lazy 注册器）。
  */
 export function registerMiddlewareTools(
   ctx: Context,
@@ -153,6 +180,8 @@ export function registerMiddlewareTools(
     disabledTools?: DisabledToolsMap;
     /** 可选调用统计收集器。 */
     stats?: McpStatsCollector;
+    /** lazy 模式的按需定义注册器；lazy 之外不注册装载器（没有「未注册的真实工具」可装）。 */
+    registrar?: Registrar;
   } = {},
 ): () => void {
   const disposers: Array<() => void> = [];
@@ -161,17 +190,21 @@ export function registerMiddlewareTools(
   if (options.disabledTools !== undefined) mw.disabledTools = disabledTools;
 
   const toolCtx: MiddlewareToolContext = { mw, resolveRoot, mode, stats: options.stats };
-  const tools = [
+  const tools: ToolDefinition[] = [
     buildSearchTool(toolCtx),
     buildCallTool(toolCtx),
     buildListTool(toolCtx),
     buildDetailTool(toolCtx),
   ];
+  // lazy：追加装载器。其它模式没有「未注册的真实工具」，暴露只会误导模型。
+  if (mode === "lazy" && options.registrar !== undefined) {
+    tools.push(buildLoadTool(toolCtx, options.registrar));
+  }
   for (const tool of tools) {
     disposers.push(ctx.tools.register(tool));
   }
 
-  const guardDispose = registerPreExecuteGuard(ctx, mw, resolveRoot);
+  const guardDispose = registerPreExecuteGuard(ctx, mw, resolveRoot, { mode, registrar: options.registrar });
   if (guardDispose !== undefined) {
     disposers.push(guardDispose);
   }

@@ -21,5 +21,10 @@ export type {
   ListServerEntry,
   ToolDetail,
   ListCatalogResult,
+  LoadedToolEntry,
+  LoadResult,
+  LazyRegistrarStats,
+  LazyLoadable,
+  Registrar,
 } from "./middleware-types.ts";
 export type { ManagerLite, RoutesManager, MiddlewareHost, SupervisorLite } from "./host-faces.ts";

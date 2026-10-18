@@ -39,7 +39,10 @@ export class McpStatsCollector {
     searches: {},
     lists: {},
     details: {},
+    loadCounts: {},
   };
+  /** 当前已装载工具数（lazy 模式注册器回填；内存态，不参与落盘恢复）。 */
+  private loadedTools: number = 0;
   private flushTimer?: NodeJS.Timeout;
   private isDirty: boolean = false;
 
@@ -108,6 +111,7 @@ export class McpStatsCollector {
           this.disclosure.searches = { ...data.disclosure.searches };
           this.disclosure.lists = { ...data.disclosure.lists };
           this.disclosure.details = { ...data.disclosure.details };
+          this.disclosure.loadCounts = { ...data.disclosure.loadCounts };
         }
       }
     } catch {
@@ -192,6 +196,25 @@ export class McpStatsCollector {
     this.scheduleFlush();
   }
 
+  /** 记录渐进式披露漏斗：ws_mcp_load 一次真正生效的装载（幂等命中不计数）。 */
+  recordLoad(server: string, tool: string): void {
+    if (!this.enabled) return;
+    const key = `${server}/${tool}`;
+    this.disclosure.loadCounts[key] = (this.disclosure.loadCounts[key] ?? 0) + 1;
+    this.updatedAt = new Date().toISOString();
+    this.scheduleFlush();
+  }
+
+  /** 回填当前已装载工具数（lazy 注册器在装载 / 回收后调用；内存态快照）。 */
+  setLoadedTools(count: number): void {
+    const next = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+    if (next === this.loadedTools) return;
+    this.loadedTools = next;
+    if (!this.enabled) return;
+    this.updatedAt = new Date().toISOString();
+    this.scheduleFlush();
+  }
+
   /** 导出当前快照（只读数据对象）。 */
   snapshot(): McpStatsSnapshot {
     const serversObj: Record<string, ServerStats> = {};
@@ -215,7 +238,9 @@ export class McpStatsCollector {
         searches: { ...this.disclosure.searches },
         lists: { ...this.disclosure.lists },
         details: { ...this.disclosure.details },
+        loadCounts: { ...this.disclosure.loadCounts },
       },
+      loadedTools: this.loadedTools,
     };
   }
 

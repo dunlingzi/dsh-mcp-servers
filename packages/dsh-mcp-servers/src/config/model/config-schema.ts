@@ -30,7 +30,7 @@ export const Config: z<{
   catalogMaxEntries: number;
   enhanceEmptyDescriptions: boolean;
   resultTruncateBytes: number;
-  middleware: "off" | "project" | "all";
+  middleware: "off" | "project" | "all" | "lazy";
   middlewarePolicy: Record<string, unknown>;
   debug: {
     callStats: boolean;
@@ -44,8 +44,8 @@ export const Config: z<{
   catalogMaxEntries: z.number().default(DEFAULT_CATALOG_MAX_ENTRIES).description("目录注入条目上限").disabled(true),
   enhanceEmptyDescriptions: z.boolean().default(DEFAULT_ENHANCE_EMPTY_DESCRIPTIONS).description("空描述工具条件拼接自定义描述"),
   resultTruncateBytes: z.number().default(DEFAULT_RESULT_TRUNCATE_BYTES).description("工具结果截断字节数").disabled(true),
-  middleware: z.union([z.const("off"), z.const("project"), z.const("all")]).default("project")
-    .description("MCP 中间层模式：off=直接注册 mcp__ 工具（默认兼容）；project=项目级走 ws_mcp_search/ws_mcp_call（推荐）；all=全部走中间层"),
+  middleware: z.union([z.const("off"), z.const("project"), z.const("all"), z.const("lazy")]).default("lazy")
+    .description("MCP 中间层模式：lazy=全部走中间层 + 工具定义按需 ws_mcp_load 装载（默认，常驻工具面最小）；off=直接注册 mcp__ 工具（旧行为）；project=项目级走 ws_mcp_search/ws_mcp_call、全局仍直呼；all=全部走中间层但启动时全量注册"),
   middlewarePolicy: z.dict(z.any()).default({})
     .description("中间层策略：{ allowTools: {<server>: [glob]}, denyTools: {<server>: [glob]} }，server 为裸名"),
   debug: DebugConfigSchema.disabled(true),

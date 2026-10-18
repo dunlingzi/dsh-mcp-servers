@@ -9,7 +9,7 @@
  * 错误脱敏与状态广播以回调注入。本文件不 import 本域门面（避免 interface → impl 回边），
  * 也不持有任何模块级可变状态。
  */
-import { MIDDLEWARE_GLOBAL_ROOT, SCOPE_GLOBAL, SCOPE_PROJECT } from "../../workspace/interface.ts";
+import { MIDDLEWARE_GLOBAL_ROOT, SCOPE_GLOBAL, SCOPE_PROJECT, coversGlobal } from "../../workspace/interface.ts";
 import type { McpMiddleware } from "../runtime/interface.ts";
 import type { McpStore } from "../../config/store/interface.ts";
 import type { MiddlewareMode } from "../../types/interface.ts";
@@ -31,14 +31,15 @@ export type EmitStatus = () => void;
 
 /**
  * 中间层接管判定（start / reconcileServers 单一口径）：中间层模式的项目级，
- * 或 all 模式的全局级（**含 runtime 注入条目**，#413 消除豁免——all 模式
+ * 或 all / lazy 模式的全局级（**含 runtime 注入条目**，#413 消除豁免——all / lazy
  * 统一无 mcp__ 前缀直呼，runtime 封装定义服务器经中间层目录投影 + callTool
  * 直呼执行；project / off 模式 runtime 照旧 supervisor 路径注册 mcp__ 工具）。
+ * lazy 漏改本判定 → 同一服务器被 supervisor 与连接池各拉一个子进程（双进程）。
  */
 export function middlewareTakes(host: MiddlewareHost, name: string, scope: string): boolean {
   if (host.middlewareMode === "off" || host.middleware === undefined) return false;
   if (scope === SCOPE_PROJECT) return true;
-  return host.middlewareMode === "all" && scope === SCOPE_GLOBAL;
+  return coversGlobal(host.middlewareMode) && scope === SCOPE_GLOBAL;
 }
 
 /**

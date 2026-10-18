@@ -9,6 +9,7 @@
 import { randomUUID } from "node:crypto";
 import type { ServerConfig } from "../types/interface.ts";
 import type { SupervisorLite } from "../types/interface.ts";
+import { normalizeMiddlewareMode } from "../workspace/interface.ts";
 import type { CatalogMessage } from "./injection.ts";
 
 /** 目录条目。 */
@@ -188,22 +189,30 @@ export function composeCatalogEntries(supervisors: Map<string, SupervisorLite>, 
  *   （项目级走中间层；完整盘点用 ws_mcp_list，查完整 schema 用 ws_mcp_detail）；
  * - 仅 global 条目 → 默认保持 mcp__ 直呼引导（全局服务器不经中间层检索）；
  *   all 模式（mode === "all"）下全局也走中间层 → 同样引导经中间层工具访问。
+ * - lazy 模式（mode === "lazy"）下没有常驻 mcp__ 工具：引导固定为
+ *   「search/list → ws_mcp_load → 下一步直呼 mcp__<server>__<tool>」，与
+ *   catalog 只列服务器摘要的事实一致（工具名不在目录里，需检索）。
  * 口径统一（#362 评审修正）：project 模式全局服务器仍以 mcp__ 直呼注册可用，
  * 目录引导区分「经中间层访问」与「mcp__ 直呼」两类服务器，不混用。
  */
 export function renderMcpCatalogMessage(entries: CatalogEntry[], mode?: string): CatalogMessage {
+  const normalized = normalizeMiddlewareMode(mode);
   const hasProject = entries.some((entry) => entry.scope === "project");
   const projectGuidance =
     "Project-level servers MUST be accessed via middleware tools: search with `ws_mcp_search`, verify schema with `ws_mcp_detail` if uncertain, then invoke with `ws_mcp_call` (use `ws_mcp_list` for full inventory audits). **Do NOT invoke project-level servers using mcp__ prefixed tools directly**.";
+  const lazyGuidance =
+    "Lazy mode (lazy): all servers (project-level and global) are held by the middleware pool and **no mcp__ tools are registered up front**. Find a tool with `ws_mcp_search` (use `ws_mcp_list` for a full inventory audit), load it with `ws_mcp_load`, then call the typed `mcp__<server>__<tool>` directly on the next step. Repeat calls to ws_mcp_load are idempotent; do not loop through `ws_mcp_call` for repeated use.";
   const globalGuidance =
-    mode === "all"
+    normalized === "all"
       ? "Global servers are also accessed via middleware in all mode: search with `ws_mcp_search`, then invoke with `ws_mcp_call` using the same `ws_mcp_*` suite."
       : "Global servers are directly invoked using `mcp__<server>__<tool>` prefixed tools (project mode does not route global servers through middleware).";
-  const guidance = hasProject
-    ? `${projectGuidance} ${globalGuidance}`
-    : mode === "all"
-      ? globalGuidance
-      : `When a task matches a server's capability, call its \`mcp__<server>__<tool>\` tool directly (see tool list for parameters). ${globalGuidance}`;
+  const guidance = normalized === "lazy"
+    ? lazyGuidance
+    : hasProject
+      ? `${projectGuidance} ${globalGuidance}`
+      : normalized === "all"
+        ? globalGuidance
+        : `When a task matches a server's capability, call its \`mcp__<server>__<tool>\` tool directly (see tool list for parameters). ${globalGuidance}`;
   const lines = [
     "<system-reminder>",
     "Configured MCP servers in this session (**capability descriptions only, does not reflect active connection status**; tools register once connected via GUI \"MCP\" popup):",

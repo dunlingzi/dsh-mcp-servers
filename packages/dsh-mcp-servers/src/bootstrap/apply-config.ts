@@ -59,7 +59,11 @@ export function resolveApplyOptions(config: Record<string, unknown> | undefined,
   };
 }
 
-/** 解析中间层模式（settings 持久化值优先，回落 config 默认 project，#389 M2）。 */
+/**
+ * 解析中间层模式（settings 持久化值优先，回落 config 默认 `lazy`；#389 M2）。
+ * 默认值与 config-schema 的 `.default()` 必须同源——两处漂移会造成「配置文件缺省
+ * 走 lazy、代码缺省走 project」的分裂（P4 起默认由 project 改为 lazy）。
+ */
 export function resolveMiddlewareMode(manager: McpServers, fallbackRaw: string | undefined): ReturnType<typeof normalizeMiddlewareMode> {
   const settingsSource = manager.uiConfigSource();
   const persistedMiddleware =
@@ -67,7 +71,7 @@ export function resolveMiddlewareMode(manager: McpServers, fallbackRaw: string |
       ? (settingsSource as Record<string, unknown>).middleware
       : undefined;
   return normalizeMiddlewareMode(
-    typeof persistedMiddleware === "string" ? persistedMiddleware : fallbackRaw ?? "project",
+    typeof persistedMiddleware === "string" ? persistedMiddleware : fallbackRaw ?? "lazy",
   );
 }
 

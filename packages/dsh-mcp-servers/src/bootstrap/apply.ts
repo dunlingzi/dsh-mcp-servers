@@ -17,7 +17,8 @@
 import type { Context } from "@deepseek-ai/cordis";
 import { McpServers } from "../connection/orchestrator/interface.ts";
 import { McpStore } from "../config/store/interface.ts";
-import { registerMiddlewareTools, registerDirectMcpGuard } from "../inject/interface.ts";
+import { registerMiddlewareTools, registerDirectMcpGuard, createRegistrar } from "../inject/interface.ts";
+import type { MiddlewareMode, Registrar } from "../types/interface.ts";
 import { loadDisabledTools } from "../config/store/interface.ts";
 import { makeMiddlewareHotSwitch } from "./apply-runtime.ts";
 import { normalizeMiddlewareMode, makeResolveRoot } from "../workspace/interface.ts";
@@ -31,7 +32,7 @@ import {
   resolveMiddlewareMode,
   resolveStorePath,
 } from "./apply-config.ts";
-import { MCP_GUIDANCE } from "./apply-guidance.ts";
+import { MCP_GUIDANCE, mcpGuidance } from "./apply-guidance.ts";
 // 导出面兼容：index.ts 仍从 apply.ts re-export MCP_GUIDANCE（组合根单一来源不变）。
 export { MCP_GUIDANCE };
 
@@ -52,6 +53,36 @@ interface EnabledRuntimeDisposers {
   disposeInjection: () => void;
   disposeMiddleware: () => void;
   watchCleanup: () => void;
+}
+
+/** 系统提示词 section 句柄：同一时刻只保留一份，热切换时按新模式文案重注册。 */
+interface PromptSectionHandle {
+  /** 按当前中间层模式（重）注册宣告 section（announceToAgent 关闭时为空操作）。 */
+  install(mode: MiddlewareMode | string): void;
+  dispose(): void;
+}
+
+/** 创建 section 句柄：dispose 旧的再注册新的，避免同一 section 名重复注册。 */
+function createPromptSectionHandle(ctx: Context, announce: boolean): PromptSectionHandle {
+  let dispose: () => void = () => {};
+  const clear = (): void => {
+    dispose();
+    dispose = () => {};
+  };
+  return {
+    install(mode) {
+      clear();
+      if (!announce) return;
+      // 官方 SystemPrompt.section(opts) 签名（PromptSection）；此处传参满足其形状，
+      // 经 unknown 中转以维持局部最小面写法。
+      dispose = (ctx.systemPrompt as unknown as { section(opts: Record<string, unknown>): () => void }).section({
+        name: "plugin:dsh-mcp-servers",
+        order: MCP_SECTION_ORDER,
+        text: mcpGuidance(mode),
+      });
+    },
+    dispose: clear,
+  };
 }
 
 /**
@@ -111,8 +142,15 @@ export async function apply(ctx: Context, config: Record<string, unknown> | unde
     watchCleanup: () => {},
   };
 
+  // lazy 模式的按需定义注册器：agent 作用域装载桶与全局回退槽都收在它自己的闭包
+  // 里（每插件实例一份；模块级可变状态被门禁禁止）。服务器删除 → 精确注销，
+  // 插件卸载 → 全量回收（会话中途一律不卸载，见懒装载设计稿 C2）。
+  const registrar = createRegistrar(ctx, { stats: manager.stats });
+  manager.onServerRemoved = (name) => registrar.disposeServer(name);
+  const section = createPromptSectionHandle(ctx, options.announceToAgent);
+
   if (options.enabled) {
-    runtime = await assembleEnabledRuntime(ctx, manager, options, syncMiddlewareFromSettings);
+    runtime = await assembleEnabledRuntime(ctx, manager, options, syncMiddlewareFromSettings, { registrar, section });
   }
 
   ctx.effect(() => () => {
@@ -120,6 +158,7 @@ export async function apply(ctx: Context, config: Record<string, unknown> | unde
     runtime.disposeSection();
     runtime.disposeRoutes();
     runtime.disposeMiddleware();
+    registrar.disposeAll();
     runtime.watchCleanup();
     void manager.dispose();
   }, "dsh-mcp-servers: dispose");
@@ -131,6 +170,7 @@ async function assembleEnabledRuntime(
   manager: McpServers,
   options: { announceCatalog: boolean; announceToAgent: boolean; catalogMaxEntries: number; middlewarePolicy: Record<string, unknown>; middlewareModeRaw: string | undefined },
   syncMiddlewareFromSettings: () => void,
+  lazy: { registrar: Registrar; section: PromptSectionHandle },
 ): Promise<EnabledRuntimeDisposers> {
   // F3（#382）：中间层初始化提前到 startAll 之前（防「先建后停」竞态，详见
   // apply-runtime 注释）；#389 M2：settings 合并面就绪时直接取持久化模式，
@@ -156,13 +196,18 @@ async function assembleEnabledRuntime(
     currentMiddlewareDispose = registerMiddlewareTools(ctx, mw, resolveRoot, middlewareMode, {
       disabledTools: manager.disabledTools,
       stats: manager.stats,
+      registrar: lazy.registrar,
     });
   } else {
     // D8：off 模式无中间层实例（无连接池副作用）——独立注册 mcp__ 直呼守卫。
     const guardDispose = registerDirectMcpGuard(ctx, manager.disabledTools, resolveRoot);
     if (guardDispose !== undefined) currentMiddlewareDispose = guardDispose;
   }
-  manager.setMiddlewareMode = makeMiddlewareHotSwitch(manager, options.middlewarePolicy, resolveRoot, middlewareDisposer);
+  manager.setMiddlewareMode = makeMiddlewareHotSwitch(manager, options.middlewarePolicy, resolveRoot, middlewareDisposer, {
+    registrar: lazy.registrar,
+    // 热切换后 section 按新模式重注册（lazy 的调用引导与其它模式相反）。
+    onModeApplied: (mode) => lazy.section.install(mode),
+  });
 
   await manager.startAll();
   await manager.loadCatalogCache();
@@ -182,13 +227,11 @@ async function assembleEnabledRuntime(
 
   let disposeSection = () => {};
   if (options.announceToAgent) {
-    // 官方 SystemPrompt.section(opts) 签名（PromptSection）；此处传参满足其形状，
-    // 经 unknown 中转以维持局部最小面写法。
-    disposeSection = (ctx.systemPrompt as unknown as { section(opts: Record<string, unknown>): () => void }).section({
-      name: "plugin:dsh-mcp-servers",
-      order: MCP_SECTION_ORDER,
-      text: MCP_GUIDANCE,
-    });
+    // lazy 下文案与工具面必须同源（search → load → 直呼）；热切换时重注册。
+    // 取 manager 上的**现态**而非启动时的局部快照：上方 syncMiddlewareFromSettings
+    // 可能已热切换过一次（此时 section 已由 onModeApplied 按新模式装好）。
+    lazy.section.install(manager.middlewareMode);
+    disposeSection = () => lazy.section.dispose();
   }
 
   return {
